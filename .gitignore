@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# 大檔：資料與模型不進 git
+data/*
+!data/README.md
+models/*
+
+# 雜項
+.env
+.DS_Store
