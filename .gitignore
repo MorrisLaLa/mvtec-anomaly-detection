@@ -13,3 +13,4 @@ models/*
 # 雜項
 .env
 .DS_Store
+!models/README.md
