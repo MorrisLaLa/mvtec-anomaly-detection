@@ -2,7 +2,7 @@ import os
 
 from tests.conftest import png, qr_text
 
-BASE = {"case_no": "C-001", "employee": "王小明"}
+BASE = {"client_id": "C-001", "employee": "王小明"}
 
 
 def post(client, data=None, receipt=None, signature=None):
@@ -14,8 +14,8 @@ def post(client, data=None, receipt=None, signature=None):
     return client.post("/api/v1/submit", data={**BASE, **(data or {})}, files=files or None)
 
 
-def row(db, case_no="C-001"):
-    r = db.execute("SELECT * FROM expenses WHERE case_no=?", (case_no,)).fetchone()
+def row(db, client_id="C-001"):
+    r = db.execute("SELECT * FROM expenses WHERE client_id=?", (client_id,)).fetchone()
     return dict(r) if r else None
 
 
@@ -119,7 +119,7 @@ def test_submit_user_category_wins_and_correction_recorded(client, db):
     assert [tuple(x) for x in c] == [("大都會計程車", "交通", "差旅")]
 
 
-def test_submit_idempotent_by_case_no(client, db):
+def test_submit_idempotent_by_client_id(client, db):
     d = {"amount": "10", "store": "a", "seller_tax_id": "04541302"}
     assert post(client, d).status_code == 200
     r2 = post(client, d)
@@ -128,14 +128,14 @@ def test_submit_idempotent_by_case_no(client, db):
 
 
 def test_submit_rejects_bad_input(client):
-    assert client.post("/api/v1/submit", data={"employee": "x"}).status_code == 422
+    assert client.post("/api/v1/submit", data={"employee": "x"}).status_code == 422  # 缺 client_id
     assert post(client, {"amount": "abc"}).status_code == 422
     assert post(client, {"amount": "-5"}).status_code == 422
     assert post(client, {"amount": "1", "seller_tax_id": "123"}).status_code == 422
 
 
-def test_submit_case_no_cannot_escape_storage(client, settings):
-    r = post(client, {"case_no": "../../evil", "amount": "1", "store": "x"}, receipt=png())
+def test_submit_client_id_cannot_escape_storage(client, settings):
+    r = post(client, {"client_id": "../../evil", "amount": "1", "store": "x"}, receipt=png())
     assert r.status_code == 422
 
 
@@ -149,3 +149,27 @@ def test_export_csv(client):
     r = client.get("/api/v1/export")
     assert r.status_code == 200
     assert "C-001" in r.text and "店A" in r.text
+
+
+def test_project_case_no_is_separate_and_not_unique(client, db):
+    post(client, {"client_id": "A1", "amount": "1", "store": "x", "case_no": "UY2301", "owner_case_no": "CPC-2026-042"})
+    post(client, {"client_id": "A2", "amount": "2", "store": "x", "case_no": "UY2301"})
+    rows = db.execute("SELECT client_id, case_no, owner_case_no FROM expenses ORDER BY id").fetchall()
+    assert [tuple(r) for r in rows] == [("A1", "UY2301", "CPC-2026-042"), ("A2", "UY2301", None)]
+
+
+def test_no_receipt_over_limit_flagged_for_review(client, db):
+    b = post(client, {"amount": "1001", "store": "x", "category": "待分類", "doc_type": "無單據"}).json()
+    assert b["needs_review"] is True and any("1,000" in r for r in b["review_reasons"])
+    ok = post(client, {"client_id": "A2", "amount": "1000", "store": "x", "category": "待分類", "doc_type": "無單據"}).json()
+    assert ok["needs_review"] is False
+    other = post(client, {"client_id": "A3", "amount": "5000", "store": "x", "category": "五金材料", "doc_type": "統一發票"}).json()
+    assert other["needs_review"] is False
+
+
+def test_voucher_saved(client, db):
+    post(client, {"amount": "1", "store": "x"}, signature=png())
+    assert row(db)["voucher_path"] is None
+    r = client.post("/api/v1/submit", data={**BASE, "client_id": "V1", "amount": "1", "store": "x"},
+                    files={"voucher": ("v.png", png(), "image/png")})
+    assert r.status_code == 200 and os.path.exists(row(db, "V1")["voucher_path"])

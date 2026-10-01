@@ -1,4 +1,4 @@
-"""Playwright 端到端：真實 uvicorn 後端 + 瀏覽器。"""
+"""Playwright 端到端：真實 uvicorn 後端 + 瀏覽器載入 frontend/expense-demo.html（走 PIN／案號／分類／簽名真實流程）。"""
 import os
 import socket
 import sqlite3
@@ -13,7 +13,8 @@ import pytest
 playwright_sync = pytest.importorskip("playwright.sync_api")
 
 ROOT = Path(__file__).resolve().parent.parent
-CHROMIUM = next((p for p in ("/opt/pw-browsers/chromium",) if os.path.exists(p)), None)
+CHROMIUM = "/opt/pw-browsers/chromium" if os.path.exists("/opt/pw-browsers/chromium") else None
+PAGE = "/pwa/expense-demo.html"
 
 
 def free_port():
@@ -29,13 +30,17 @@ class Server:
         self.env = {**os.environ, "EXPENSE_DB_PATH": self.db, "EXPENSE_STORAGE_DIR": str(tmp / "r")}
         self.proc = None
 
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.port}"
+
     def start(self):
         self.proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(self.port), "--log-level", "warning"],
             cwd=ROOT, env=self.env)
         for _ in range(100):
             try:
-                urllib.request.urlopen(f"http://127.0.0.1:{self.port}/api/v1/health", timeout=1)
+                urllib.request.urlopen(f"{self.url}/api/v1/health", timeout=1)
                 return
             except Exception:
                 time.sleep(0.1)
@@ -47,10 +52,10 @@ class Server:
             self.proc.wait(5)
             self.proc = None
 
-    def rows(self):
+    def query(self, sql):
         c = sqlite3.connect(self.db)
         try:
-            return c.execute("SELECT case_no, amount, seller_tax_id FROM expenses").fetchall()
+            return c.execute(sql).fetchall()
         finally:
             c.close()
 
@@ -69,81 +74,102 @@ def page():
         kw = {"executable_path": CHROMIUM} if CHROMIUM else {}
         b = p.chromium.launch(**kw)
         pg = b.new_context().new_page()
+        pg.route("**/fonts.g*/**", lambda r: r.abort())  # 沙箱無外網；字型載入失敗不影響功能
         yield pg
         b.close()
 
 
-def fill_and_send(page, case_no):
-    page.fill("#case_no", case_no)
-    page.fill("#amount", "120")
-    page.fill("#store", "測試店")
-    page.fill("#seller_tax_id", "04541302")
-    page.fill("#category", "餐飲")
-    page.click("#send")
+def login(page, server, retry_ms=None, timeout_ms=None):
+    """走真實的身份選擇 + 設定 PIN 流程。"""
+    page.goto(server.url + PAGE)
+    page.click(".user-option >> nth=0")
+    for _ in range(2):  # 設定 + 確認
+        for d in "1234":
+            page.click(f".pin-key:text-is('{d}')")
+        page.wait_for_timeout(300)
+    page.wait_for_selector("#screen-home", state="visible")
+    cfg = {k: v for k, v in {"RETRY_BASE_MS": retry_ms, "TIMEOUT_MS": timeout_ms}.items() if v}
+    if cfg:
+        page.evaluate("c => ExpenseSync.configure(c)", cfg)
 
 
-def test_online_submit_reaches_db_and_clears_queue(server, page):
-    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html")
-    fill_and_send(page, "E2E-1")
-    page.wait_for_function("document.getElementById('status').textContent.includes('已送出')")
+def submit_no_receipt(page, amount="120", store="測試店", category="五金材料", sign=False):
+    page.click("#homeActionBar button:has-text('無單據')")
+    page.fill("#fieldAmount", amount)
+    page.fill("#fieldStore", store)
+    if category:
+        page.click(f"#categoryChips .chip:text-is('{category}')")
+    if sign:
+        page.click("#signatureBox")
+        box = page.locator("#sigCanvas").bounding_box()
+        page.mouse.move(box["x"] + 40, box["y"] + 60)
+        page.mouse.down()
+        page.mouse.move(box["x"] + 160, box["y"] + 120, steps=8)
+        page.mouse.up()
+        page.click("#sigOverlay button:has-text('確認簽名')")
+    page.click(".btn-submit")
+
+
+def entry_text(page):
+    return page.inner_text("#entryList .entry >> nth=0")
+
+
+def wait_pending_zero(page, seconds=15):
+    deadline = time.time() + seconds
+    while page.evaluate("ExpenseSync.pending()") != 0:
+        assert time.time() < deadline, "queue never drained"
+        time.sleep(0.2)  # wait_for_function 不會 await Promise，改在 Python 端輪詢
+
+
+def test_online_submit_reaches_db_with_project_case_and_clears_queue(server, page):
+    login(page, server)
+    submit_no_receipt(page)
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
     assert page.evaluate("ExpenseSync.pending()") == 0
-    assert server.rows() == [("E2E-1", 120, "04541302")]
+    rows = server.query("SELECT case_no, owner_case_no, doc_type, employee, amount, store, category, needs_review FROM expenses")
+    assert rows == [("UY2301", "CPC-2026-042", "無單據", "王志明", 120, "測試店", "五金材料", 0)]
 
 
-def test_server_offline_keeps_queue_then_flushes_on_recovery(server, page):
-    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?timeout=2000&retry=300")
+def test_server_offline_keeps_queue_then_recovers(server, page):
+    login(page, server, retry_ms=300, timeout_ms=2000)
     server.stop()
-    fill_and_send(page, "E2E-2")
-    page.wait_for_function("document.getElementById('status').textContent.includes('佇列')")
+    submit_no_receipt(page)
+    page.wait_for_selector("#netStrip.offline")
+    assert "待同步" in entry_text(page)
     assert page.evaluate("ExpenseSync.pending()") == 1
-    server.start()  # 同埠重啟（示範頁無 service worker，離線時無法 reload，所以先恢復伺服器）
-    page.reload()  # 重新整理後佇列仍在（IndexedDB 持久化）
-    assert page.evaluate("ExpenseSync.pending()") == 1
-    r = page.evaluate("ExpenseSync.flush()")
-    assert r["remaining"] == 0
-    assert server.rows() == [("E2E-2", 120, "04541302")]
-
-
-def test_auto_retry_flushes_after_server_returns(server, page):
-    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?timeout=1000&retry=200")
-    server.stop()
-    fill_and_send(page, "E2E-3")
-    page.wait_for_function("document.getElementById('status').textContent.includes('佇列')")
     server.start()
-    deadline = time.time() + 15
-    while page.evaluate("ExpenseSync.pending()") != 0:  # wait_for_function 不會 await Promise，改在 Python 端輪詢
-        assert time.time() < deadline, "auto retry never flushed the queue"
-        time.sleep(0.2)
-    assert server.rows() == [("E2E-3", 120, "04541302")]
+    wait_pending_zero(page)  # 背景遞增重試自動補送
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    assert len(server.query("SELECT 1 FROM expenses")) == 1
 
 
-def test_4xx_is_final_failure_not_queued_message_shown(server, page):
+def test_queue_survives_reload_and_resends(server, page):
+    login(page, server, retry_ms=300, timeout_ms=2000)
+    server.stop()
+    submit_no_receipt(page)
+    page.wait_for_selector("#netStrip.offline")
+    server.start()
+    page.reload()  # 重新整理：佇列在 IndexedDB，載入後還原並自動重送
+    page.click(".pin-key:text-is('1')"); page.click(".pin-key:text-is('2')")
+    page.click(".pin-key:text-is('3')"); page.click(".pin-key:text-is('4')")
+    page.wait_for_selector("#screen-home", state="visible")
+    wait_pending_zero(page)
+    assert len(server.query("SELECT 1 FROM expenses")) == 1
+
+
+def test_4xx_is_final_failure_message_shown_and_not_retried(server, page):
     calls = []
-    page.on("request", lambda r: calls.append(r.url) if r.url.endswith("/api/v1/submit") else None)
-    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?retry=200")
-    page.fill("#case_no", "E2E-BAD")
-    page.fill("#amount", "abc")  # 後端回 422
-    page.click("#send")
-    page.wait_for_function("document.getElementById('status').textContent.includes('失敗')")
-    assert "amount" in page.inner_text("#status")  # 顯示後端的錯誤訊息
+    page.on("request", lambda r: calls.append(1) if r.url.endswith("/api/v1/submit") else None)
+    login(page, server, retry_ms=200)
+    submit_no_receipt(page, amount="")  # 後端回 422：amount 必填
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=送出失敗")
+    assert "amount" in entry_text(page)
     assert page.evaluate("ExpenseSync.pending()") == 0
-    page.wait_for_timeout(1200)  # 若被放進重試佇列，這段時間內會再送
+    page.wait_for_timeout(1200)
     assert len(calls) == 1
-    assert server.rows() == []
+    assert server.query("SELECT 1 FROM expenses") == []
     failed = page.evaluate("ExpenseSync.failed()")
-    assert len(failed) == 1 and failed[0]["status"] == 422 and failed[0]["case_no"] == "E2E-BAD"
-
-
-def test_4xx_does_not_block_following_items(server, page):
-    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?retry=200")
-    r = page.evaluate("""async () => {
-        const S = ExpenseSync;
-        await S.enqueueOnly({fields: {case_no: 'Q-BAD', amount: 'abc'}});
-        await S.enqueueOnly({fields: {case_no: 'Q-OK', amount: '5', store: 's', category: 'x'}});
-        return await S.flush();
-    }""")
-    assert r["sent"] == 1 and r["remaining"] == 0 and len(r["failed"]) == 1
-    assert server.rows() == [("Q-OK", 5, None)]
+    assert len(failed) == 1 and failed[0]["status"] == 422
 
 
 def test_5xx_stays_queued_then_retries_to_success(server, page):
@@ -151,21 +177,70 @@ def test_5xx_stays_queued_then_retries_to_success(server, page):
 
     def handler(route):
         state["n"] += 1
-        if state["fail"]:
-            route.fulfill(status=503, body="unavailable")
-        else:
-            route.continue_()
+        route.fulfill(status=503, body="unavailable") if state["fail"] else route.continue_()
 
     page.route("**/api/v1/submit", handler)
-    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?retry=200")
-    fill_and_send(page, "E2E-5XX")
-    page.wait_for_function("document.getElementById('status').textContent.includes('佇列')")
-    assert page.evaluate("ExpenseSync.pending()") == 1
-    assert page.evaluate("ExpenseSync.failed()") == []
+    login(page, server, retry_ms=200)
+    submit_no_receipt(page)
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=待同步")
+    time.sleep(0.8)
+    assert page.evaluate("ExpenseSync.pending()") == 1 and page.evaluate("ExpenseSync.failed()") == []
     state["fail"] = False
-    deadline = time.time() + 15
-    while page.evaluate("ExpenseSync.pending()") != 0:
-        assert time.time() < deadline
-        time.sleep(0.2)
+    wait_pending_zero(page)
     assert state["n"] >= 2
-    assert server.rows() == [("E2E-5XX", 120, "04541302")]
+    assert len(server.query("SELECT 1 FROM expenses")) == 1
+
+
+def test_item_queued_while_flush_in_progress_is_not_stranded(server, page):
+    n = {"c": 0}
+
+    def slow_first(route):
+        n["c"] += 1
+        if n["c"] == 1:
+            time.sleep(0.6)
+        route.continue_()
+
+    page.route("**/api/v1/submit", slow_first)
+    login(page, server)
+    page.evaluate("""async () => {
+        const mk = (id) => ({fields: {client_id: id, amount: '5', store: 's', category: 'x'}});
+        const p1 = ExpenseSync.submit(mk('RACE-1'));
+        await new Promise(r => setTimeout(r, 150));   // 第一筆請求仍在途中
+        const p2 = ExpenseSync.submit(mk('RACE-2'));
+        await Promise.all([p1, p2]);
+    }""")
+    wait_pending_zero(page, 5)
+    assert sorted(r[0] for r in server.query("SELECT client_id FROM expenses")) == ["RACE-1", "RACE-2"]
+
+
+def test_4xx_does_not_block_following_items(server, page):
+    login(page, server)
+    r = page.evaluate("""async () => {
+        await ExpenseSync.enqueueOnly({fields: {client_id: 'Q-BAD', amount: 'abc'}});
+        await ExpenseSync.enqueueOnly({fields: {client_id: 'Q-OK', amount: '5', store: 's', category: 'x'}});
+        return await ExpenseSync.flush();
+    }""")
+    assert r["sent"] == 1 and r["remaining"] == 0 and len(r["failed"]) == 1
+    assert server.query("SELECT client_id FROM expenses") == [("Q-OK",)]
+
+
+def test_category_correction_is_reported_to_backend(server, page):
+    login(page, server)
+    submit_no_receipt(page, store="神秘小店", category="五金材料")  # 系統判斷「待分類」→ 使用者改成五金材料
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    assert server.query("SELECT store, from_category, to_category FROM classify_corrections") == [("神秘小店", "待分類", "五金材料")]
+
+
+def test_no_receipt_over_1000_marked_for_manager_review(server, page):
+    login(page, server)
+    submit_no_receipt(page, amount="1500")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=待審核")
+    assert server.query("SELECT needs_review FROM expenses") == [(1,)]
+
+
+def test_signature_and_voucher_uploaded(server, page):
+    login(page, server)
+    submit_no_receipt(page, sign=True)
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    sig, vou = server.query("SELECT signature_path, voucher_path FROM expenses")[0]
+    assert sig and vou and os.path.getsize(sig) > 100 and os.path.getsize(vou) > 1000

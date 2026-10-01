@@ -4,7 +4,10 @@ from pathlib import Path
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS expenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_no TEXT NOT NULL UNIQUE,
+    client_id TEXT NOT NULL UNIQUE,
+    case_no TEXT,
+    owner_case_no TEXT,
+    doc_type TEXT,
     employee TEXT,
     amount INTEGER NOT NULL,
     expense_date TEXT,
@@ -22,6 +25,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     needs_review INTEGER NOT NULL DEFAULT 0,
     receipt_path TEXT,
     signature_path TEXT,
+    voucher_path TEXT,
     note TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

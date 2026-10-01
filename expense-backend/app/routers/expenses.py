@@ -12,6 +12,7 @@ from ..storage import is_safe_name
 
 router = APIRouter()
 MAX_UPLOAD = 10 * 1024 * 1024
+NO_RECEIPT_LIMIT = 1000
 
 
 def get_db(request: Request):
@@ -69,7 +70,10 @@ def rules(db=Depends(get_db)):
 @router.post("/submit")
 async def submit(
     request: Request,
-    case_no: str = Form(...),
+    client_id: str = Form(...),
+    case_no: str = Form(""),
+    owner_case_no: str = Form(""),
+    doc_type: str = Form(""),
     employee: str = Form(""),
     amount: str = Form(""),
     expense_date: str = Form(""),
@@ -80,11 +84,12 @@ async def submit(
     note: str = Form(""),
     receipt: UploadFile | None = File(None),
     signature: UploadFile | None = File(None),
+    voucher: UploadFile | None = File(None),
     db=Depends(get_db),
 ):
     st = request.app.state
-    if not is_safe_name(case_no):
-        raise HTTPException(422, "case_no 只能包含英數字、_、-（最長64）")
+    if not is_safe_name(client_id):
+        raise HTTPException(422, "client_id 只能包含英數字、_、-（最長64）")
     seller_tax_id = seller_tax_id.strip()
     if seller_tax_id and not re.fullmatch(r"[0-9]{8}", seller_tax_id):
         raise HTTPException(422, "seller_tax_id 必須為8碼數字")
@@ -94,13 +99,14 @@ async def submit(
             raise HTTPException(422, "amount 必須為正整數")
         amount_val = int(amount)
 
-    existing = db.execute("SELECT * FROM expenses WHERE case_no=?", (case_no,)).fetchone()
+    existing = db.execute("SELECT * FROM expenses WHERE client_id=?", (client_id,)).fetchone()
     if existing:  # 離線佇列重送：冪等，回傳既有結果
         return _response(existing, duplicate=True)
 
     receipt_bytes = (await receipt.read(MAX_UPLOAD + 1)) if receipt else b""
     signature_bytes = (await signature.read(MAX_UPLOAD + 1)) if signature else b""
-    if len(receipt_bytes) > MAX_UPLOAD or len(signature_bytes) > MAX_UPLOAD:
+    voucher_bytes = (await voucher.read(MAX_UPLOAD + 1)) if voucher else b""
+    if max(len(receipt_bytes), len(signature_bytes), len(voucher_bytes)) > MAX_UPLOAD:
         raise HTTPException(413, "檔案過大")
 
     reasons: list[str] = []
@@ -148,30 +154,35 @@ async def submit(
     if cat is None:
         reasons.append("無法自動判斷分類，請人工選擇")
 
-    spath = rpath = None
+    if doc_type.strip() == "無單據" and amount_val > NO_RECEIPT_LIMIT:
+        reasons.append(f"無單據金額超過 NT${NO_RECEIPT_LIMIT:,}，需主管審核")
+
+    spath = rpath = vpath = None
     try:
         if receipt_bytes:
-            rpath = st.storage.save(case_no, "receipt", receipt_bytes)
+            rpath = st.storage.save(client_id, "receipt", receipt_bytes)
         if signature_bytes:
-            spath = st.storage.save(case_no, "signature", signature_bytes)
+            spath = st.storage.save(client_id, "signature", signature_bytes)
+        if voucher_bytes:
+            vpath = st.storage.save(client_id, "voucher", voucher_bytes)
     except ValueError:
         raise HTTPException(422, "檔名不合法")
 
     needs_review = 1 if reasons else 0
     db.execute(
-        """INSERT INTO expenses(case_no, employee, amount, expense_date, store, seller_tax_id, buyer_tax_id,
+        """INSERT INTO expenses(client_id, case_no, owner_case_no, doc_type, employee, amount, expense_date, store, seller_tax_id, buyer_tax_id,
            invoice_no, invoice_date, category, category_source, category_confidence, recognition_source,
-           recognition_confidence, recognition_note, needs_review, receipt_path, signature_path, note)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (case_no, employee, amount_val, expense_date or invoice_date, store, seller_tax_id or None, buyer_tax_id,
+           recognition_confidence, recognition_note, needs_review, receipt_path, signature_path, voucher_path, note)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (client_id, case_no.strip() or None, owner_case_no.strip() or None, doc_type.strip() or None, employee, amount_val, expense_date or invoice_date, store, seller_tax_id or None, buyer_tax_id,
          invoice_no, invoice_date, cat, cat_src, cat_conf, rec["source"], rec["confidence"], rec_note,
-         needs_review, rpath, spath, note),
+         needs_review, rpath, spath, vpath, note),
     )
     db.commit()
     if suggested_category.strip() and cat_src == "user":
         classify.record_correction(store, suggested_category.strip(), cat, conn=db)
 
-    row = db.execute("SELECT * FROM expenses WHERE case_no=?", (case_no,)).fetchone()
+    row = db.execute("SELECT * FROM expenses WHERE client_id=?", (client_id,)).fetchone()
     return _response(row, recognition=rec, reasons=reasons)
 
 
@@ -182,6 +193,7 @@ def _response(row, duplicate=False, recognition=None, reasons=None):
         "ok": True,
         "duplicate": duplicate,
         "id": row["id"],
+        "client_id": row["client_id"],
         "case_no": row["case_no"],
         "store": row["store"],
         "seller_tax_id": row["seller_tax_id"],

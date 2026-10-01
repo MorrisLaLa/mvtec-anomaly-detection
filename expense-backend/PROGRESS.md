@@ -65,8 +65,7 @@
 - 測試結果：`tests/test_recognition.py` 32/32 通過
 
 ## [修正3] 接入 expense-demo.html
-- 狀態：**卡住待回報**（附件未收到，環境內找不到該檔）
-- 備註：現有 `frontend/sync.js` 已具備你要求的行為，收到 HTML 後只需引入並替換其送出邏輯；PIN／簽名／案號／分類確認畫面不會動。
+- 狀態：完成（見下方「第三輪」；本條原先因附件未收到而卡住）
 
 ## [修正4] 4xx 不重試，只重試 5xx 與網路逾時
 - 狀態：完成
@@ -86,3 +85,28 @@
 ## [修正6] 公司統編設定
 - 狀態：完成
 - 備註：未改動你的統編。為了配合你的 `company.tax_id` 結構，`config.py` 現在優先讀 `company.tax_id`，並相容舊的 `my_company_tax_id`（有測試）。你的 `settings.yaml` 其他欄位我看不到，若結構不同請提供。
+
+---
+# 第三輪：expense-demo.html 已收到並接入
+
+## [修正3] 前端串接真實 API
+- 狀態：完成
+- 測試結果：Playwright 10 個（驅動 `frontend/expense-demo.html`，走真實的身份選擇＋PIN 設定→無單據→填寫→分類→簽名→送出）；全部 79/79（含後端 69）
+- 自我修正迴圈次數：3（皆為先紅後修）
+- 檔案：`frontend/expense-demo.html`（你的原檔加上同步改動）、`frontend/sync.js`。舊的示範頁 `frontend/index.html` 已刪除。
+- **對你的 HTML 做的改動（其餘一律未動）：**
+  1. 引入 `sync.js`，新增 `SERVER_URL` 常數（預設空字串＝同源；改 Tailscale 時填位址）。
+  2. 取代 `submitEntry` 後半、`loadPendingQueue`／`savePendingQueue`／`syncPendingQueue`／`toggleNetworkDemo` 等模擬離線邏輯：改為寫入 IndexedDB 佇列→`POST /api/v1/submit`，HTTP 200 才清除；狀態標籤依伺服器回應變為「已記錄」或「待審核」。
+  3. 網路狀態列不再是「點一下示範離線」的假開關，改反映真實狀態（`navigator.onLine`＋同步是否因網路/5xx/逾時卡住），點一下＝立即同步。
+  4. `renderCategoryChips` 多記一個 `autoCategory`，送出時以 `suggested_category` 回報，後端據此記錄使用者的分類修正。
+  5. `renderHome` 新增「送出失敗：訊息」標籤（4xx）；新增 `escapeHtml` 輔助函式。
+  PIN、簽名、案號、分類確認、憑證合成、門檻橫幅的邏輯與樣式沒有改動。
+- **後端配合調整（需你確認）：**
+  - 你的「案號」是專案案號（UY2301），而我重建的後端把 `case_no` 當作每筆申報的唯一冪等鍵，兩者衝突。已改為：新增 `client_id`（前端產生的 UUID，唯一、冪等），`case_no` 改存專案案號（可重複），另增 `owner_case_no`、`doc_type`、`voucher_path` 欄位。這屬於 schema 變動，但因為整個後端仍是我重建的版本（等你的 zip），風險僅限於重建版；若 zip 的 schema 不同，請以 zip 為準，我再對齊。
+  - 後端加上「無單據且金額 > NT$1,000 → needs_review」，與前端橫幅規則一致（伺服器端強制）。
+  - `/submit` 新增可選的 `voucher` 檔案（簽名＋資料合成的憑證圖）。
+- 發現並修正的真 bug：同步進行中又有新申報入列時，新項目會卡在佇列（沒有人再觸發同步）；現在本輪結束後會自動再跑一輪。UI 的離線判斷也改用 `stalled`（真的遇到可重試錯誤），避免誤報離線。
+- **已知限制（請知悉）：**
+  - 原 HTML 的「拍照申報／相簿上傳」仍是模擬辨識（`DEMO_RECEIPTS`），沒有真的選取或上傳單據照片，所以目前這個介面**不會觸發後端的 QR／OCR 辨識**。要接上需要新增 `<input type=file capture>` 與預覽，這會改到你的拍照流程，等你決定。
+  - 4xx 失敗的項目（連同圖片）留在本機 `failed` 清單並顯示於列表，目前沒有「修正後重送」或「刪除」的介面。
+  - 頁面還沒有 service worker，離線時重新整理頁面本身會載入失敗（資料不會丟）。
