@@ -13,6 +13,7 @@ class Settings:
     db_path: str = "data/expense.db"
     storage_dir: str = "data/receipts"
     default_rules: list = field(default_factory=list)
+    cors_origins: list = field(default_factory=list)
 
 
 def load_settings() -> Settings:
@@ -20,10 +21,11 @@ def load_settings() -> Settings:
     path = Path(os.environ.get("EXPENSE_CONFIG", ROOT / "config" / "settings.yaml"))
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     s = Settings(
-        my_company_tax_id=str(raw.get("my_company_tax_id", "")),
+        my_company_tax_id=str((raw.get("company") or {}).get("tax_id") or raw.get("my_company_tax_id", "")),
         db_path=os.environ.get("EXPENSE_DB_PATH", raw.get("db_path", Settings.db_path)),
         storage_dir=os.environ.get("EXPENSE_STORAGE_DIR", raw.get("storage_dir", Settings.storage_dir)),
         default_rules=raw.get("default_rules", []),
+        cors_origins=list(raw.get("cors_allowed_origins") or []),
     )
     for attr in ("db_path", "storage_dir"):
         p = Path(getattr(s, attr))

@@ -29,7 +29,9 @@
     const r = await ExpenseSync.submit({ fields: {
       case_no: g('case_no'), employee: g('employee'), amount: g('amount'),
       store: g('store'), seller_tax_id: g('seller_tax_id'), category: g('category') } });
-    document.getElementById('status').textContent = r.remaining ? '已排入佇列，待連線後重送' : '已送出';
+    document.getElementById('status').textContent = r.failed.length
+      ? '失敗：' + r.failed.map((f) => f.message).join('；')
+      : r.remaining ? '已排入佇列，待連線後重送' : '已送出';
     refresh();
   });
   refresh();

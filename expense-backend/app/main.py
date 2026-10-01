@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from . import database
@@ -19,6 +20,12 @@ def create_app(
     database.init_db(settings.db_path, settings.default_rules)
     app = FastAPI(title="Expense Backend")
     app.state.settings = settings
+    origins = [o.strip() for o in settings.cors_origins]
+    if any(o == "*" or "*" in o for o in origins):
+        raise ValueError("cors_allowed_origins 不可使用萬用字元，請列出明確的來源")
+    if origins:
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"],
+                           allow_headers=["Content-Type"], max_age=600)
     app.state.ocr = ocr or NullOCRProvider()
     app.state.storage = storage or LocalStorage(settings.storage_dir)
     app.state.db_factory = lambda: database.connect(settings.db_path)

@@ -115,3 +115,57 @@ def test_auto_retry_flushes_after_server_returns(server, page):
         assert time.time() < deadline, "auto retry never flushed the queue"
         time.sleep(0.2)
     assert server.rows() == [("E2E-3", 120, "04541302")]
+
+
+def test_4xx_is_final_failure_not_queued_message_shown(server, page):
+    calls = []
+    page.on("request", lambda r: calls.append(r.url) if r.url.endswith("/api/v1/submit") else None)
+    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?retry=200")
+    page.fill("#case_no", "E2E-BAD")
+    page.fill("#amount", "abc")  # 後端回 422
+    page.click("#send")
+    page.wait_for_function("document.getElementById('status').textContent.includes('失敗')")
+    assert "amount" in page.inner_text("#status")  # 顯示後端的錯誤訊息
+    assert page.evaluate("ExpenseSync.pending()") == 0
+    page.wait_for_timeout(1200)  # 若被放進重試佇列，這段時間內會再送
+    assert len(calls) == 1
+    assert server.rows() == []
+    failed = page.evaluate("ExpenseSync.failed()")
+    assert len(failed) == 1 and failed[0]["status"] == 422 and failed[0]["case_no"] == "E2E-BAD"
+
+
+def test_4xx_does_not_block_following_items(server, page):
+    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?retry=200")
+    r = page.evaluate("""async () => {
+        const S = ExpenseSync;
+        await S.enqueueOnly({fields: {case_no: 'Q-BAD', amount: 'abc'}});
+        await S.enqueueOnly({fields: {case_no: 'Q-OK', amount: '5', store: 's', category: 'x'}});
+        return await S.flush();
+    }""")
+    assert r["sent"] == 1 and r["remaining"] == 0 and len(r["failed"]) == 1
+    assert server.rows() == [("Q-OK", 5, None)]
+
+
+def test_5xx_stays_queued_then_retries_to_success(server, page):
+    state = {"fail": True, "n": 0}
+
+    def handler(route):
+        state["n"] += 1
+        if state["fail"]:
+            route.fulfill(status=503, body="unavailable")
+        else:
+            route.continue_()
+
+    page.route("**/api/v1/submit", handler)
+    page.goto(f"http://127.0.0.1:{server.port}/pwa/index.html?retry=200")
+    fill_and_send(page, "E2E-5XX")
+    page.wait_for_function("document.getElementById('status').textContent.includes('佇列')")
+    assert page.evaluate("ExpenseSync.pending()") == 1
+    assert page.evaluate("ExpenseSync.failed()") == []
+    state["fail"] = False
+    deadline = time.time() + 15
+    while page.evaluate("ExpenseSync.pending()") != 0:
+        assert time.time() < deadline
+        time.sleep(0.2)
+    assert state["n"] >= 2
+    assert server.rows() == [("E2E-5XX", 120, "04541302")]

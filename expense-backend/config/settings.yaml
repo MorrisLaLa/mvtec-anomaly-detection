@@ -1,5 +1,9 @@
-# 己方（公司）統一編號：OCR 抽取時會排除。請改成實際統編。
-my_company_tax_id: "22099131"
+# 己方（公司）統一編號：OCR 抽取時會排除。（佔位值，請以實際統編取代）
+company:
+  tax_id: "22099131"
+# PWA 實際使用的來源（scheme://host[:port]），不可用 *。留空 = 只允許同源。
+cors_allowed_origins: []
+#  - "http://100.x.y.z:8080"
 db_path: data/expense.db
 storage_dir: data/receipts
 default_rules:
