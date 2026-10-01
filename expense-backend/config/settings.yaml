@@ -1,0 +1,10 @@
+# 己方（公司）統一編號：OCR 抽取時會排除。請改成實際統編。
+my_company_tax_id: "22099131"
+db_path: data/expense.db
+storage_dir: data/receipts
+default_rules:
+  - {keyword: 計程車, category: 交通, confidence: 0.9}
+  - {keyword: 高鐵, category: 交通, confidence: 0.9}
+  - {keyword: 星巴克, category: 餐飲, confidence: 0.9}
+  - {keyword: 便當, category: 餐飲, confidence: 0.8}
+  - {keyword: 文具, category: 辦公用品, confidence: 0.8}

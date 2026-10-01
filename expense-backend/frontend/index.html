@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>支出申報（同步示範）</title></head>
+<body>
+<h1>支出申報</h1>
+<form id="f">
+  <input id="case_no" placeholder="案號" required>
+  <input id="employee" placeholder="姓名">
+  <input id="amount" placeholder="金額" inputmode="numeric">
+  <input id="store" placeholder="店家">
+  <input id="seller_tax_id" placeholder="賣方統編">
+  <input id="category" placeholder="分類">
+  <button id="send" type="submit">送出</button>
+</form>
+<p>待同步：<span id="pending">0</span>　<span id="status"></span></p>
+<script src="sync.js"></script>
+<script>
+  // 伺服器位址：同源部署時留空；改用 Tailscale 時改成 'http://100.x.y.z:8000'
+  const params = new URLSearchParams(location.search);
+  ExpenseSync.configure({
+    SERVER_URL: params.get('server') || '',
+    TIMEOUT_MS: +params.get('timeout') || 10000,
+    RETRY_BASE_MS: +params.get('retry') || 2000,
+  });
+  const refresh = async () => (document.getElementById('pending').textContent = await ExpenseSync.pending());
+  document.getElementById('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const g = (id) => document.getElementById(id).value;
+    const r = await ExpenseSync.submit({ fields: {
+      case_no: g('case_no'), employee: g('employee'), amount: g('amount'),
+      store: g('store'), seller_tax_id: g('seller_tax_id'), category: g('category') } });
+    document.getElementById('status').textContent = r.remaining ? '已排入佇列，待連線後重送' : '已送出';
+    refresh();
+  });
+  refresh();
+</script>
+</body></html>

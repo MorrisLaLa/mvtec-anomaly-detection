@@ -1,0 +1,73 @@
+import sqlite3
+from pathlib import Path
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_no TEXT NOT NULL UNIQUE,
+    employee TEXT,
+    amount INTEGER NOT NULL,
+    expense_date TEXT,
+    store TEXT,
+    seller_tax_id TEXT,
+    buyer_tax_id TEXT,
+    invoice_no TEXT,
+    invoice_date TEXT,
+    category TEXT,
+    category_source TEXT,
+    category_confidence REAL,
+    recognition_source TEXT,
+    recognition_confidence TEXT,
+    recognition_note TEXT,
+    needs_review INTEGER NOT NULL DEFAULT 0,
+    receipt_path TEXT,
+    signature_path TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS vendors (
+    tax_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    default_category TEXT
+);
+CREATE TABLE IF NOT EXISTS classify_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    keyword TEXT NOT NULL UNIQUE,
+    category TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0.9
+);
+CREATE TABLE IF NOT EXISTS classify_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    store TEXT NOT NULL,
+    from_category TEXT,
+    to_category TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
+
+def connect(db_path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db(db_path: str, default_rules: list | None = None) -> None:
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    conn = connect(db_path)
+    try:
+        conn.executescript(SCHEMA)
+        for r in default_rules or []:
+            conn.execute(
+                "INSERT OR IGNORE INTO classify_rules(keyword,category,confidence) VALUES(?,?,?)",
+                (r["keyword"], r["category"], r.get("confidence", 0.9)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def default_connection() -> sqlite3.Connection:
+    from .config import load_settings
+
+    return connect(load_settings().db_path)
