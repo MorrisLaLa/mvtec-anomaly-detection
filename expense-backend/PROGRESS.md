@@ -136,3 +136,9 @@
 - Q9：AWS、台灣 → M4 採台北區域 `ap-east-2`；Lightsail 在台北是否提供**尚未確認**，上線前須核對 AWS 官方區域服務清單。
 - 查證來源：AWS 台北區域開放（https://aws.amazon.com/de/blogs/aws/now-open-aws-asia-pacific-taipei-region/）；2025-07 免費方案改制（https://aws.amazon.com/about-aws/whats-new/2025/07/aws-free-tier-credits-month-free-plan/）。
 - 尚未核准任何模組；`docs/APPROVALS.md` 全為 `[ ]`，夜間排程仍只會「無事可做」。
+
+---
+# 規格修訂 2（台北約 16:45）
+- Q2 方案 B：已確認。Q7a–c：使用者回「可以」，視為接受建議預設；Q8 關閉（由自動審核規則涵蓋）。
+- 仍待使用者回答：Q1、Q3、Q4、Q5、Q10、Q11、Q12，以及新增 Q13（admin 是誰）。
+- 尚未核准任何模組（`docs/APPROVALS.md` 全為 `[ ]`）。
