@@ -127,3 +127,12 @@
   Q9 雲端供應商與區域；Q10 通知負責人與管道；Q11 網域；Q12 備份保留與還原演練頻率。
 - 下一步：使用者審閱規格 → 在 `docs/APPROVALS.md` 勾選已核准的模組 → 夜間排程才會開始實作該模組。
 - 仍阻塞：`expense-backend.zip` 尚未提供（A17）。
+
+---
+# 規格修訂 1：使用者回覆 Q6／Q2／Q7／Q9（台北 16:38）
+- Q6：保存 5 年 → M2 修訂（`retention_days=1825`、到期自動刪除、備份同步到期）。起算點仍請會計確認。
+- Q2：使用者不同意 429 自動重試 → M1 採方案 B：4xx 一律不自動重試，改為使用者手動「重送／刪除」，401 重新綁定後手動重送；伺服器端讓 429 少發生。待使用者確認方案 B。
+- Q7：改自動審核 → M3 新增自動審核引擎（自動核准／自動退回／轉人工），門檻 ⚠ 待確認（Q7a–c）；轉人工案件仍需一位 admin。
+- Q9：AWS、台灣 → M4 採台北區域 `ap-east-2`；Lightsail 在台北是否提供**尚未確認**，上線前須核對 AWS 官方區域服務清單。
+- 查證來源：AWS 台北區域開放（https://aws.amazon.com/de/blogs/aws/now-open-aws-asia-pacific-taipei-region/）；2025-07 免費方案改制（https://aws.amazon.com/about-aws/whats-new/2025/07/aws-free-tier-credits-month-free-plan/）。
+- 尚未核准任何模組；`docs/APPROVALS.md` 全為 `[ ]`，夜間排程仍只會「無事可做」。
