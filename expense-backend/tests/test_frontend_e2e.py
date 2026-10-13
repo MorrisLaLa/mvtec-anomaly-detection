@@ -59,6 +59,22 @@ class Server:
             self.proc.wait(5)
             self.proc = None
 
+    def exec(self, sql):
+        c = sqlite3.connect(self.db)
+        try:
+            c.execute(sql)
+            c.commit()
+        finally:
+            c.close()
+
+    def new_device(self, name, role="submitter"):
+        from app import admin, database
+        c = database.connect(self.db)
+        try:
+            return admin.create_device(c, name, role)["key"]
+        finally:
+            c.close()
+
     def query(self, sql):
         c = sqlite3.connect(self.db)
         try:
@@ -86,10 +102,14 @@ def page():
         b.close()
 
 
-def login(page, server, retry_ms=None, timeout_ms=None):
+def login(page, server, retry_ms=None, timeout_ms=None, policy="any", init_script=None):
     """走真實的身份選擇 + 設定 PIN 流程。"""
     # 綁定畫面屬 F1（尚未實作）：暫時由測試直接把裝置金鑰放進本機儲存
     page.add_init_script(f"try {{ localStorage.setItem('expense_device_key', '{server.key}') }} catch (e) {{}}")
+    if policy:  # 既有測試不關心 Wi-Fi 策略：預設「不限網路」；F1 測試傳 policy=None 以使用預設的僅 Wi-Fi
+        page.add_init_script(f"try {{ localStorage.setItem('expense_upload_policy', '{policy}') }} catch (e) {{}}")
+    if init_script:
+        page.add_init_script(init_script)
     page.goto(server.url + PAGE)
     page.click(".user-option >> nth=0")
     for _ in range(2):  # 設定 + 確認

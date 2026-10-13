@@ -794,11 +794,29 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
   .toast svg { width: 16px; height: 16px; color: var(--good); flex: none; }
 
+  .wifi-row { display:flex; align-items:center; gap:8px; padding:7px 18px; font-size:11.5px; color:var(--ink-soft); border-top:1px solid var(--line); }
+  .wifi-row input { -webkit-appearance:checkbox; appearance:auto; width:16px; height:16px; margin:0; }
+  .entry-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .mini-btn { border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 9px; font-size:11px; font-weight:600; cursor:pointer; }
+  .mini-btn.danger { color:var(--alert); border-color:var(--alert); }
+
   ::selection { background: var(--hazard); color: var(--hazard-ink); }
 </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- ===== 裝置綁定畫面（首次開啟或金鑰失效時） ===== -->
+  <div id="screen-bind" class="screen" style="display:none;">
+    <div class="onboard">
+      <div class="onboard-badge">$</div>
+      <div class="onboard-title">綁定這支手機</div>
+      <div class="onboard-sub">請輸入管理員交給你的裝置金鑰。金鑰只會存在這支手機，用來證明這是公司核准的裝置。</div>
+      <div class="field-box"><input type="text" id="bindKey" placeholder="ek_…" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
+      <div class="pin-error" id="bindError" style="margin-top:10px;"></div>
+      <button class="onboard-manual-btn" style="padding:14px; margin-top:4px;" onclick="submitBind()">綁定</button>
+    </div>
+  </div>
 
   <!-- ===== Onboarding / Identity Screen ===== -->
   <div id="screen-onboarding" class="screen" style="display:none;">
@@ -813,6 +831,7 @@
         <div class="field-box"><input type="text" id="manualUserInput" placeholder="輸入姓名"></div>
         <button class="onboard-manual-btn" onclick="confirmManualUser()">開始使用</button>
       </div>
+      <div class="pin-alt-link" style="text-align:center;" onclick="showBind()">重新綁定裝置金鑰</div>
     </div>
   </div>
 
@@ -867,6 +886,7 @@
         <span id="netLabel">線上 · 資料即時同步</span>
         <span class="net-strip-hint">（點一下立即同步）</span>
       </div>
+      <label class="wifi-row"><input type="checkbox" id="wifiOnly" onchange="onWifiToggle()"> 僅 Wi‑Fi 自動上傳（省行動網路流量）</label>
     </div>
 
     <div class="section-label">
@@ -1259,10 +1279,17 @@ function renderHome() {
     div.className = 'entry' + (e._new ? ' new' : '');
     if (e.voucherImage) { div.style.cursor = 'pointer'; div.onclick = () => openVoucherViewer(e.voucherImage); }
     const statusTag = e.status === 'failed'
-      ? `<span class="tag tag-review">送出失敗：${escapeHtml(e.failMessage || '')}</span>`
+      ? `<span class="tag tag-review">${escapeHtml(failText(e))}</span>`
+      : e.status === 'waiting-wifi'
+      ? `<span class="tag tag-pending">${ExpenseSync.networkKind() === 'unsupported' ? '待上傳（請在 Wi‑Fi 下按「立即上傳」）' : '等待 Wi‑Fi'}</span>`
       : e.status === 'pending-sync'
       ? '<span class="tag tag-pending">待同步</span>'
       : (e.status === 'review' ? '<span class="tag tag-review">待審核</span>' : '<span class="tag tag-ok">已記錄</span>');
+    const actions = e.status === 'failed'
+      ? `<div class="entry-actions">${e.failStatus === 401 ? `<button class="mini-btn" onclick="rebindDevice(event)">重新綁定</button>` : ''}<button class="mini-btn" onclick="resendEntry('${e.clientId}', event)">重送</button><button class="mini-btn danger" onclick="deleteFailedEntry('${e.clientId}', event)">刪除</button></div>`
+      : e.status === 'waiting-wifi'
+      ? `<div class="entry-actions"><button class="mini-btn" onclick="forceUploadEntry('${e.clientId}', event)">本筆改用行動網路上傳</button></div>`
+      : '';
     div.innerHTML = `
       <div class="entry-icon">${iconForType(e.category === '待分類' && e.type === '無單據' ? '無單據' : e.category)}</div>
       <div class="entry-body">
@@ -1278,6 +1305,7 @@ function renderHome() {
           ${e.reporter ? `<span class="tag tag-user">${e.reporter}</span>` : ''}
           <span class="entry-date">${fmtDate(e.date)}</span>
         </div>
+        ${actions}
       </div>`;
     list.appendChild(div);
     e._new = false;
@@ -1297,7 +1325,7 @@ function closeVoucherViewer(evt) {
 
 // ---------------- Screen switching ----------------
 function showScreen(id) {
-  ['screen-onboarding','screen-pin','screen-home','screen-processing','screen-review'].forEach(s => {
+  ['screen-bind','screen-onboarding','screen-pin','screen-home','screen-processing','screen-review'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
   });
   document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
@@ -1527,7 +1555,9 @@ async function submitEntry() {
 
   entries.unshift(entry);
   pendingCount++;
-  showToast(isOnline ? '申報送出中…' : '已離線存檔，恢復連線後自動上傳');
+  showToast(!ExpenseSync.autoAllowed()
+    ? (ExpenseSync.networkKind() === 'unsupported' ? '已存檔，請在 Wi‑Fi 下按「立即上傳」' : '已存檔，連上 Wi‑Fi 後自動上傳')
+    : (isOnline ? '申報送出中…' : '已離線存檔，恢復連線後自動上傳'));
   updateNetUI();
   goHome();
   runSync();
@@ -1615,6 +1645,7 @@ function buildVoucherImage(data) {
 let isOnline = navigator.onLine !== false;
 let syncStalled = false;   // 上一輪同步有項目因網路/5xx 留在佇列
 let pendingCount = 0;
+let heldKind = null;       // 因上傳策略（非 Wi‑Fi）而等待時的網路類型
 
 function entryFromMeta(clientId, meta, status, failMessage) {
   if (!meta) return null;
@@ -1631,7 +1662,7 @@ async function loadPendingQueue() {
     const [pend, failed] = await Promise.all([ExpenseSync.pendingItems(), ExpenseSync.failed()]);
     const restored = [
       ...pend.map(i => entryFromMeta(i.client_id, i.meta, 'pending-sync')),
-      ...failed.map(i => entryFromMeta(i.client_id, i.meta, 'failed', i.message)),
+      ...failed.map(i => { const x = entryFromMeta(i.client_id, i.meta, 'failed', i.message); if (x) { x.failStatus = i.status; x.retryAfter = i.retryAfter; } return x; }),
     ].filter(Boolean);
     entries = [...restored, ...entries];
     pendingCount = pend.length;
@@ -1648,11 +1679,77 @@ function runSync() {
 }
 function syncNow() {
   if (!pendingCount) { showToast('沒有待同步的資料'); return; }
+  if (!ExpenseSync.autoAllowed()) { // 非 Wi‑Fi：使用者明確要求才上傳
+    const msg = ExpenseSync.networkKind() === 'unsupported'
+      ? '請確認目前已連上 Wi‑Fi，再上傳這些資料。要上傳嗎？'
+      : '目前不是 Wi‑Fi，上傳會使用行動網路流量。要繼續嗎？';
+    if (!confirm(msg)) return;
+    ExpenseSync.flush({ force: true });
+    return;
+  }
   runSync();
+}
+
+function failText(e) {
+  if (e.failStatus === 401) return '裝置未授權，請重新綁定';
+  if (e.failStatus === 429) return `請求太頻繁，請約 ${Math.max(1, Math.ceil((e.retryAfter || 60) / 60))} 分鐘後再送`;
+  return '送出失敗：' + (e.failMessage || '');
+}
+async function resendEntry(id, ev) {
+  if (ev) ev.stopPropagation();
+  const e = entries.find(x => x.clientId === id);
+  if (e) { e.status = 'pending-sync'; e.failMessage = ''; e.failStatus = null; pendingCount++; renderHome(); updateNetUI(); }
+  await ExpenseSync.retryFailed(id);
+}
+async function deleteFailedEntry(id, ev) {
+  if (ev) ev.stopPropagation();
+  if (!confirm('刪除這筆失敗的申報？刪除後無法復原。')) return;
+  await ExpenseSync.dismissFailed(id);
+  entries = entries.filter(x => x.clientId !== id);
+  renderHome();
+}
+function forceUploadEntry(id, ev) {
+  if (ev) ev.stopPropagation();
+  if (!confirm('這筆會使用行動網路上傳，要繼續嗎？')) return;
+  ExpenseSync.flush({ only: id });
+}
+function rebindDevice(ev) { if (ev) ev.stopPropagation(); showBind(); }
+function onWifiToggle() {
+  ExpenseSync.setPolicy(document.getElementById('wifiOnly').checked ? 'wifi_only' : 'any');
+  updateNetUI();
+  if (ExpenseSync.autoAllowed()) runSync();
+}
+
+// ---------------- 裝置綁定 ----------------
+function showBind(msg) {
+  document.getElementById('bindError').textContent = msg || '';
+  document.getElementById('bindKey').value = '';
+  showScreen('screen-bind');
+}
+async function submitBind() {
+  const key = document.getElementById('bindKey').value.trim();
+  const err = (m) => { document.getElementById('bindError').textContent = m; };
+  if (!key) { err('請輸入金鑰'); return; }
+  try {
+    const r = await fetch(SERVER_URL + '/api/v1/rules', { headers: { Authorization: 'Bearer ' + key } });
+    if (r.status === 200) {
+      ExpenseSync.setKey(key);
+      showToast('已綁定這支手機');
+      if (currentUser) { goHome(); return; }
+      const saved = loadUser();
+      if (saved) chooseIdentity(saved); else { renderUserGrid(); showScreen('screen-onboarding'); }
+    } else if (r.status === 401) err('金鑰無效、已過期或已被撤銷');
+    else if (r.status === 429) err('嘗試次數過多，請稍後再試');
+    else err('伺服器回應異常（' + r.status + '）');
+  } catch (e) { err('連不上伺服器，請確認網路'); }
 }
 
 // sync.js 每輪同步結束（含背景自動重試）都會呼叫
 function onSyncFlush(r) {
+  // 等待 Wi‑Fi 不是失敗：依上傳策略標示尚在佇列的項目
+  const waiting = !ExpenseSync.autoAllowed();
+  entries.forEach(e => { if (e.status === 'pending-sync' || e.status === 'waiting-wifi') e.status = waiting ? 'waiting-wifi' : 'pending-sync'; });
+  heldKind = waiting && r.remaining > 0 ? ExpenseSync.networkKind() : null;
   Object.keys(r.results).forEach(id => {
     const e = entries.find(x => x.clientId === id);
     if (e) {
@@ -1662,7 +1759,7 @@ function onSyncFlush(r) {
   });
   r.failed.forEach(f => {
     const e = entries.find(x => x.clientId === f.client_id);
-    if (e) { e.status = 'failed'; e.failMessage = f.message; }
+    if (e) { e.status = 'failed'; e.failMessage = f.message; e.failStatus = f.status; e.retryAfter = f.retryAfter; }
   });
   pendingCount = r.remaining;
   syncStalled = r.stalled; // 只有網路錯誤／5xx／逾時才算離線；單純還有新項目排隊不算
@@ -1670,7 +1767,7 @@ function onSyncFlush(r) {
   if (document.getElementById('screen-home').style.display !== 'none') renderHome();
 
   if (r.failed.length) {
-    showToast('送出失敗：' + r.failed[0].message);
+    showToast(failText({ failStatus: r.failed[0].status, retryAfter: r.failed[0].retryAfter, failMessage: r.failed[0].message }));
   } else if (r.sent === 1) {
     const e = entries.find(x => x.clientId === Object.keys(r.results)[0]);
     showToast(e && e._wasReview ? '已送出，待主管審核' : (e && e._signed ? '申報已送出（含簽收憑證）' : '申報已送出'));
@@ -1682,7 +1779,14 @@ function onSyncFlush(r) {
 function updateNetUI() {
   const strip = document.getElementById('netStrip');
   const label = document.getElementById('netLabel');
-  const offline = !isOnline || syncStalled;
+  const offline = !isOnline || syncStalled || !!heldKind;
+  if (heldKind && pendingCount) {
+    strip.classList.add('offline');
+    label.textContent = heldKind === 'unsupported'
+      ? `待上傳 ${pendingCount} 筆 · 請在 Wi‑Fi 下按此處「立即上傳」`
+      : `等待 Wi‑Fi · ${pendingCount} 筆待上傳`;
+    return;
+  }
   if (!offline) {
     strip.classList.remove('offline');
     label.textContent = pendingCount ? `線上 · 正在同步 ${pendingCount} 筆資料` : '線上 · 資料即時同步';
@@ -1790,8 +1894,11 @@ renderHome();
 updateNetUI();
 loadPendingQueue();
 
+document.getElementById('wifiOnly').checked = ExpenseSync.getPolicy() === 'wifi_only';
 const savedUser = loadUser();
-if (savedUser) {
+if (!ExpenseSync.getKey()) {
+  showBind(); // 尚未綁定裝置金鑰
+} else if (savedUser) {
   chooseIdentity(savedUser); // existing PIN on this device → shows unlock screen automatically
 } else {
   renderUserGrid();
