@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -5,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from . import database
+from .auth import SlidingWindow
 from .config import Settings, load_settings
 from .ocr_provider import NullOCRProvider, OCRProvider
 from .routers import expenses
@@ -20,12 +22,16 @@ def create_app(
     database.init_db(settings.db_path, settings.default_rules)
     app = FastAPI(title="Expense Backend")
     app.state.settings = settings
+    app.state.clock = lambda: datetime.now(timezone.utc)
+    app.state.fail_window = SlidingWindow()
+    app.state.rate_window = SlidingWindow()
     origins = [o.strip() for o in settings.cors_origins]
     if any(o == "*" or "*" in o for o in origins):
         raise ValueError("cors_allowed_origins 不可使用萬用字元，請列出明確的來源")
     if origins:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"],
-                           allow_headers=["Content-Type"], max_age=600)
+                           allow_headers=["Content-Type", "Authorization"],
+                           expose_headers=["X-Key-Expires-In-Days", "Retry-After"], max_age=600)
     app.state.ocr = ocr or NullOCRProvider()
     app.state.storage = storage or LocalStorage(settings.storage_dir)
     app.state.db_factory = lambda: database.connect(settings.db_path)

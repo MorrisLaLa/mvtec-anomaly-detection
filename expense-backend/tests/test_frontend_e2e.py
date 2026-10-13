@@ -29,6 +29,13 @@ class Server:
         self.db = str(tmp / "e2e.db")
         self.env = {**os.environ, "EXPENSE_DB_PATH": self.db, "EXPENSE_STORAGE_DIR": str(tmp / "r")}
         self.proc = None
+        # M1：伺服器需要裝置金鑰。申報人姓名取自裝置名稱
+        sys.path.insert(0, str(ROOT))
+        from app import admin, database
+        database.init_db(self.db)
+        c = database.connect(self.db)
+        self.key = admin.create_device(c, "王志明", "submitter")["key"]
+        c.close()
 
     @property
     def url(self):
@@ -81,6 +88,8 @@ def page():
 
 def login(page, server, retry_ms=None, timeout_ms=None):
     """走真實的身份選擇 + 設定 PIN 流程。"""
+    # 綁定畫面屬 F1（尚未實作）：暫時由測試直接把裝置金鑰放進本機儲存
+    page.add_init_script(f"try {{ localStorage.setItem('expense_device_key', '{server.key}') }} catch (e) {{}}")
     page.goto(server.url + PAGE)
     page.click(".user-option >> nth=0")
     for _ in range(2):  # 設定 + 確認

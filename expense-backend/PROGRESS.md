@@ -157,3 +157,19 @@
 - 修正後的 M1 仍已核准（APPROVALS 不變），可在白天工作階段（可推送）依 20 分鐘規則實作。
 - Q3：金鑰到期可由 admin 自訂，預設 365 天 → M1「修訂 3」。
 - Q4（新需求：僅 Wi‑Fi 自動上傳）→ 新增 `docs/specs/F1-frontend-sync.md`；iPhone 無法自動偵測連線類型（待實機驗證），背景上傳需原生 App；待回答 Q14／Q15。
+
+---
+# 視窗 2：M1 身分與授權（白天，使用者指示本次限時 30 分鐘；台北 10:58–11:05，實際約 7 分鐘）
+
+## [M1] 身分與授權
+- 狀態：完成（後端）；前台綁定畫面屬 F1（視窗 4），尚未做
+- 測試結果：**全部 102／102 通過**（M1 新增 `tests/test_auth.py` 23 個；既有測試改為帶金鑰；Playwright e2e 10 個仍全綠）
+- 自我修正迴圈次數：2（先紅後綠；自審階段補了 5 個測試並修 4 個問題）
+- 新增：`app/auth.py`（金鑰雜湊、角色、限流）、`app/admin.py`（命令列：create-device／list／revoke／set-expiry）、`devices` 資料表、`expenses.device_id`／`payload_hash`、`(device_id, client_id)` 唯一、到期提示標頭 `X-Key-Expires-In-Days`、CORS 允許 Authorization 並暴露 `X-Key-Expires-In-Days`／`Retry-After`。
+- Q3：金鑰到期可由 admin 設定，預設 365 天（`settings.yaml` 的 `auth.device_key_default_days`）。
+- 自審發現並修正：① 限流計數器可能無限成長（加清掃上限）；② 跨來源瀏覽器讀不到到期標頭（CORS expose）；③ 同名裝置使 revoke 歧義（改為拒絕）；④ 同時送出相同申報會因唯一鍵衝突而 500（改為回傳既有結果）；⑤ **不同裝置相同 `client_id` 會覆寫彼此的收據檔（資料完整性問題，已修）**。另有一個我寫壞的測試（假的競態測試）已替換成真正製造競態的版本。
+- 對抗探測（金鑰放網址、SQL 注入字串、10KB 標頭、小寫 scheme、空 Bearer）：全部乾淨回 401，無 500。
+- **設計決定與偏離（詳見 `docs/specs/M1-auth.md` 修訂 4，請使用者確認）：** 封鎖只針對無效金鑰、有效金鑰照常通過（偏離原驗收條件 4）；IP 取自 `request.client.host`，放反向代理之後前必須先做 M4 的受信任代理設定。
+- 限制：目前現有前台沒有綁定畫面，沒有金鑰會收到 401；e2e 測試暫以注入 localStorage 金鑰通過。**在 F1（視窗 4）完成前，前台不可實際使用。**
+- 夜間排程：仍暫停（`trig_01VhULHWTZZBRQrEuvZoezmR`）。推送被拒的原因與修法見上方「夜間排程故障診斷」。
+- 下一步：視窗 3（M2 收件加固，需使用者核准 M2）或視窗 4（F1 前台綁定與 Wi‑Fi 上傳，中風險，不需核准）。

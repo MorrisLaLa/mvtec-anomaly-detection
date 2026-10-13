@@ -1,12 +1,16 @@
 import csv
+import hashlib
 import io
+import json
 import re
+import sqlite3
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .. import classify
+from ..auth import any_device, reviewer_only
 from ..recognition import extract_seller_tax_id, is_valid_tw_ubn, parse_invoice_qr
 from ..storage import is_safe_name
 
@@ -63,7 +67,7 @@ def health():
 
 
 @router.get("/rules")
-def rules(db=Depends(get_db)):
+def rules(device=any_device, db=Depends(get_db)):
     return [dict(r) for r in db.execute("SELECT keyword, category, confidence FROM classify_rules ORDER BY keyword")]
 
 
@@ -74,7 +78,7 @@ async def submit(
     case_no: str = Form(""),
     owner_case_no: str = Form(""),
     doc_type: str = Form(""),
-    employee: str = Form(""),
+    employee: str = Form(""),  # 已忽略：申報人一律取自裝置登記的名稱（防冒名）
     amount: str = Form(""),
     expense_date: str = Form(""),
     store: str = Form(""),
@@ -85,6 +89,7 @@ async def submit(
     receipt: UploadFile | None = File(None),
     signature: UploadFile | None = File(None),
     voucher: UploadFile | None = File(None),
+    device=any_device,
     db=Depends(get_db),
 ):
     st = request.app.state
@@ -99,15 +104,24 @@ async def submit(
             raise HTTPException(422, "amount 必須為正整數")
         amount_val = int(amount)
 
-    existing = db.execute("SELECT * FROM expenses WHERE client_id=?", (client_id,)).fetchone()
-    if existing:  # 離線佇列重送：冪等，回傳既有結果
-        return _response(existing, duplicate=True)
-
     receipt_bytes = (await receipt.read(MAX_UPLOAD + 1)) if receipt else b""
     signature_bytes = (await signature.read(MAX_UPLOAD + 1)) if signature else b""
     voucher_bytes = (await voucher.read(MAX_UPLOAD + 1)) if voucher else b""
     if max(len(receipt_bytes), len(signature_bytes), len(voucher_bytes)) > MAX_UPLOAD:
         raise HTTPException(413, "檔案過大")
+
+    # 冪等：同一裝置 + 同一 client_id；內容相同 → 回傳既有結果，內容不同 → 409
+    payload_hash = hashlib.sha256(json.dumps({
+        "case_no": case_no, "owner_case_no": owner_case_no, "doc_type": doc_type, "amount": amount,
+        "expense_date": expense_date, "store": store, "seller_tax_id": seller_tax_id, "category": category,
+        "suggested_category": suggested_category, "note": note,
+        "files": [hashlib.sha256(b).hexdigest() for b in (receipt_bytes, signature_bytes, voucher_bytes)],
+    }, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    existing = db.execute("SELECT * FROM expenses WHERE device_id=? AND client_id=?", (device["id"], client_id)).fetchone()
+    if existing:
+        if existing["payload_hash"] != payload_hash:
+            raise HTTPException(409, "client_id 已用於內容不同的申報")
+        return _response(existing, duplicate=True)
 
     reasons: list[str] = []
     rec = {"source": "none", "confidence": None, "reason": None}
@@ -160,30 +174,49 @@ async def submit(
     spath = rpath = vpath = None
     try:
         if receipt_bytes:
-            rpath = st.storage.save(client_id, "receipt", receipt_bytes)
+            rpath = st.storage.save(client_id, "receipt", receipt_bytes, namespace=f"d{device['id']}")
         if signature_bytes:
-            spath = st.storage.save(client_id, "signature", signature_bytes)
+            spath = st.storage.save(client_id, "signature", signature_bytes, namespace=f"d{device['id']}")
         if voucher_bytes:
-            vpath = st.storage.save(client_id, "voucher", voucher_bytes)
+            vpath = st.storage.save(client_id, "voucher", voucher_bytes, namespace=f"d{device['id']}")
     except ValueError:
         raise HTTPException(422, "檔名不合法")
 
     needs_review = 1 if reasons else 0
-    db.execute(
-        """INSERT INTO expenses(client_id, case_no, owner_case_no, doc_type, employee, amount, expense_date, store, seller_tax_id, buyer_tax_id,
-           invoice_no, invoice_date, category, category_source, category_confidence, recognition_source,
-           recognition_confidence, recognition_note, needs_review, receipt_path, signature_path, voucher_path, note)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (client_id, case_no.strip() or None, owner_case_no.strip() or None, doc_type.strip() or None, employee, amount_val, expense_date or invoice_date, store, seller_tax_id or None, buyer_tax_id,
-         invoice_no, invoice_date, cat, cat_src, cat_conf, rec["source"], rec["confidence"], rec_note,
-         needs_review, rpath, spath, vpath, note),
-    )
-    db.commit()
+    try:
+        _insert_expense(db, device, payload_hash, client_id, case_no, owner_case_no, doc_type, amount_val, expense_date,
+                        store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec,
+                        rec_note, needs_review, rpath, spath, vpath, note)
+    except sqlite3.IntegrityError:
+        # 同一裝置同一 client_id 的請求幾乎同時抵達：另一個已寫入，回傳既有結果（內容不同則 409）
+        existing = db.execute("SELECT * FROM expenses WHERE device_id=? AND client_id=?", (device["id"], client_id)).fetchone()
+        if not existing:
+            raise
+        if existing["payload_hash"] != payload_hash:
+            raise HTTPException(409, "client_id 已用於內容不同的申報")
+        return _response(existing, duplicate=True)
     if suggested_category.strip() and cat_src == "user":
         classify.record_correction(store, suggested_category.strip(), cat, conn=db)
 
-    row = db.execute("SELECT * FROM expenses WHERE client_id=?", (client_id,)).fetchone()
+    row = db.execute("SELECT * FROM expenses WHERE device_id=? AND client_id=?", (device["id"], client_id)).fetchone()
     return _response(row, recognition=rec, reasons=reasons)
+
+
+def _insert_expense(db, device, payload_hash, client_id, case_no, owner_case_no, doc_type, amount_val, expense_date,
+                    store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec,
+                    rec_note, needs_review, rpath, spath, vpath, note):
+    db.execute(
+        """INSERT INTO expenses(device_id, payload_hash, client_id, case_no, owner_case_no, doc_type, employee, amount,
+           expense_date, store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, category, category_source,
+           category_confidence, recognition_source, recognition_confidence, recognition_note, needs_review,
+           receipt_path, signature_path, voucher_path, note)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (device["id"], payload_hash, client_id, case_no.strip() or None, owner_case_no.strip() or None,
+         doc_type.strip() or None, device["name"], amount_val, expense_date or invoice_date, store,
+         seller_tax_id or None, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec["source"],
+         rec["confidence"], rec_note, needs_review, rpath, spath, vpath, note),
+    )
+    db.commit()
 
 
 def _response(row, duplicate=False, recognition=None, reasons=None):
@@ -207,24 +240,24 @@ def _response(row, duplicate=False, recognition=None, reasons=None):
 
 
 @router.post("/corrections")
-def add_correction(c: Correction, db=Depends(get_db)):
+def add_correction(c: Correction, device=any_device, db=Depends(get_db)):
     return {"ok": True, "recorded": classify.record_correction(c.store, c.from_category, c.to_category, conn=db)}
 
 
 @router.get("/pending-rule-suggestions")
-def pending(db=Depends(get_db)):
+def pending(device=reviewer_only, db=Depends(get_db)):
     return classify.pending_rule_suggestions(conn=db)
 
 
 @router.post("/pending-rule-suggestions/confirm")
-def confirm(body: RuleConfirm, db=Depends(get_db)):
+def confirm(body: RuleConfirm, device=reviewer_only, db=Depends(get_db)):
     if not classify.confirm_rule(body.store, body.category, conn=db):
         raise HTTPException(409, "此店家／分類目前沒有待確認的建議")
     return {"ok": True}
 
 
 @router.get("/export")
-def export(db=Depends(get_db)):
+def export(device=reviewer_only, db=Depends(get_db)):
     rows = db.execute("SELECT * FROM expenses ORDER BY id").fetchall()
     buf = io.StringIO()
     w = csv.writer(buf)

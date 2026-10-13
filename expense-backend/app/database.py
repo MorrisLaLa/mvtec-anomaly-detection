@@ -2,9 +2,21 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('submitter','reviewer','admin')),
+    key_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT,
+    revoked_at TEXT,
+    last_seen_at TEXT
+);
 CREATE TABLE IF NOT EXISTS expenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id TEXT NOT NULL UNIQUE,
+    device_id INTEGER NOT NULL REFERENCES devices(id),
+    client_id TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
     case_no TEXT,
     owner_case_no TEXT,
     doc_type TEXT,
@@ -27,7 +39,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     signature_path TEXT,
     voucher_path TEXT,
     note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (device_id, client_id)
 );
 CREATE TABLE IF NOT EXISTS vendors (
     tax_id TEXT PRIMARY KEY,
@@ -53,6 +66,7 @@ CREATE TABLE IF NOT EXISTS classify_corrections (
 def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 

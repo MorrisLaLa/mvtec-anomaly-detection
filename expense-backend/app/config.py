@@ -14,6 +14,10 @@ class Settings:
     storage_dir: str = "data/receipts"
     default_rules: list = field(default_factory=list)
     cors_origins: list = field(default_factory=list)
+    device_key_default_days: int = 365
+    auth_fail_limit: int = 10
+    auth_fail_window_s: int = 900
+    device_rate_per_min: int = 60
 
 
 def load_settings() -> Settings:
@@ -26,6 +30,10 @@ def load_settings() -> Settings:
         storage_dir=os.environ.get("EXPENSE_STORAGE_DIR", raw.get("storage_dir", Settings.storage_dir)),
         default_rules=raw.get("default_rules", []),
         cors_origins=list(raw.get("cors_allowed_origins") or []),
+        device_key_default_days=int((raw.get("auth") or {}).get("device_key_default_days", 365)),
+        auth_fail_limit=int((raw.get("auth") or {}).get("fail_limit", 10)),
+        auth_fail_window_s=int((raw.get("auth") or {}).get("fail_window_seconds", 900)),
+        device_rate_per_min=int((raw.get("auth") or {}).get("device_rate_per_min", 60)),
     )
     for attr in ("db_path", "storage_dir"):
         p = Path(getattr(s, attr))

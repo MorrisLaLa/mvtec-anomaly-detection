@@ -27,7 +27,7 @@ def test_other_origin_gets_no_cors_header(tmp_path):
 
 def test_preflight_allowed_and_denied(tmp_path):
     c = make(tmp_path, [ORIGIN])
-    h = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"}
+    h = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type,authorization"}
     ok = c.options("/api/v1/submit", headers={**h, "Origin": ORIGIN})
     assert ok.status_code == 200 and ok.headers["access-control-allow-origin"] == ORIGIN
     bad = c.options("/api/v1/submit", headers={**h, "Origin": "https://evil.example.com"})

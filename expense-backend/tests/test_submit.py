@@ -1,6 +1,6 @@
 import os
 
-from tests.conftest import png, qr_text
+from tests.conftest import auth, png, qr_text
 
 BASE = {"client_id": "C-001", "employee": "王小明"}
 
@@ -144,9 +144,9 @@ def test_signature_saved(client, db):
     assert os.path.exists(row(db)["signature_path"])
 
 
-def test_export_csv(client):
+def test_export_csv(client, keys):
     post(client, {"amount": "10", "store": "店A", "seller_tax_id": "04541302"})
-    r = client.get("/api/v1/export")
+    r = client.get("/api/v1/export", headers=auth(keys["reviewer"]))
     assert r.status_code == 200
     assert "C-001" in r.text and "店A" in r.text
 

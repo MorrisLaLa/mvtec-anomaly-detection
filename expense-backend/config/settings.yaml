@@ -12,3 +12,9 @@ default_rules:
   - {keyword: 星巴克, category: 餐飲, confidence: 0.9}
   - {keyword: 便當, category: 餐飲, confidence: 0.8}
   - {keyword: 文具, category: 辦公用品, confidence: 0.8}
+# 裝置金鑰與限流（M1）
+auth:
+  device_key_default_days: 365   # 新裝置金鑰預設有效天數；可在建立／事後用 admin 命令調整
+  fail_limit: 10                 # 同一 IP 在視窗內驗證失敗幾次後封鎖「無效金鑰」的請求
+  fail_window_seconds: 900
+  device_rate_per_min: 60

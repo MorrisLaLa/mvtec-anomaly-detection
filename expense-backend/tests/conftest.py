@@ -5,6 +5,7 @@ import qrcode
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app import admin
 from app.config import Settings
 from app.main import create_app
 from app.ocr_provider import OCRProvider
@@ -36,9 +37,26 @@ def settings(tmp_path):
 
 
 @pytest.fixture
-def client(settings, ocr):
-    with TestClient(create_app(settings, ocr=ocr)) as c:
+def keys(settings):
+    """先建好資料庫與三種角色的裝置，回傳 {角色: 金鑰}。"""
+    from app import database
+    database.init_db(settings.db_path, settings.default_rules)
+    conn = database.connect(settings.db_path)
+    out = {role: admin.create_device(conn, name, role)["key"]
+           for name, role in [("王志明", "submitter"), ("陳主管", "reviewer"), ("管理員", "admin")]}
+    conn.close()
+    return out
+
+
+@pytest.fixture
+def client(settings, ocr, keys):
+    """預設以 submitter 身分呼叫；需要其他角色時請在單次請求帶 headers=auth(keys[...])。"""
+    with TestClient(create_app(settings, ocr=ocr), headers={"Authorization": f"Bearer {keys['submitter']}"}) as c:
         yield c
+
+
+def auth(key):
+    return {"Authorization": f"Bearer {key}"}
 
 
 @pytest.fixture

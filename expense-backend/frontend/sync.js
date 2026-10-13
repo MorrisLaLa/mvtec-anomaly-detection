@@ -55,7 +55,10 @@
     const ctl = new AbortController();
     const to = setTimeout(() => ctl.abort(), cfg.TIMEOUT_MS);
     try {
-      const resp = await fetch(cfg.SERVER_URL + '/api/v1/submit', { method: 'POST', body: fd, signal: ctl.signal });
+      let key = null;
+      try { key = localStorage.getItem('expense_device_key'); } catch (e) { /* storage unavailable */ }
+      const headers = key ? { Authorization: 'Bearer ' + key } : {};
+      const resp = await fetch(cfg.SERVER_URL + '/api/v1/submit', { method: 'POST', body: fd, headers, signal: ctl.signal });
       if (resp.status === 200) return { ok: true, body: await resp.json().catch(() => ({})) };
       if (resp.status >= 400 && resp.status < 500) {
         return { ok: false, final: true, status: resp.status, message: await errorMessage(resp) };
