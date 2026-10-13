@@ -18,3 +18,14 @@ auth:
   fail_limit: 10                 # 同一 IP 在視窗內驗證失敗幾次後封鎖「無效金鑰」的請求
   fail_window_seconds: 900
   device_rate_per_min: 60
+# 收件限制與保存（M2）
+limits:
+  daily_submit_limit: 100     # 每裝置每日（台北時間）最多幾筆
+  daily_upload_limit_mb: 200  # 每裝置每日上傳總量
+  max_file_mb: 5              # 單一檔案
+  max_request_mb: 15          # 整個請求本體
+logging:
+  access_log_dir: data/logs
+  retention_days: 90          # 存取記錄保留天數（不含請求本體與金鑰）
+retention:
+  retention_days: 1825        # 資料與圖片保存 5 年，到期由 `python -m app.maintenance purge` 刪除

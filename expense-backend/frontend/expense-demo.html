@@ -1136,7 +1136,7 @@ function renderUserGrid() {
     const opt = document.createElement('div');
     opt.className = 'user-option';
     opt.onclick = () => chooseIdentity(name);
-    opt.innerHTML = `<div class="user-avatar">${initials(name)}</div><div class="user-option-text">${name}</div>`;
+    opt.innerHTML = `<div class="user-avatar">${escapeHtml(initials(name))}</div><div class="user-option-text">${escapeHtml(name)}</div>`;
     grid.appendChild(opt);
   });
 }
@@ -1294,15 +1294,15 @@ function renderHome() {
       <div class="entry-icon">${iconForType(e.category === '待分類' && e.type === '無單據' ? '無單據' : e.category)}</div>
       <div class="entry-body">
         <div class="entry-top">
-          <div class="entry-store">${e.store}</div>
+          <div class="entry-store">${escapeHtml(e.store)}</div>
           <div class="entry-amount">${fmtMoney(e.amount)}</div>
         </div>
         <div class="entry-meta">
-          <span class="tag tag-case">${e.case.company}</span>
-          <span class="tag tag-cat">${e.category}</span>
+          <span class="tag tag-case">${escapeHtml(e.case.company)}</span>
+          <span class="tag tag-cat">${escapeHtml(e.category)}</span>
           ${statusTag}
           ${e.signed ? '<span class="tag tag-cat">已簽收憑證</span>' : ''}
-          ${e.reporter ? `<span class="tag tag-user">${e.reporter}</span>` : ''}
+          ${e.reporter ? `<span class="tag tag-user">${escapeHtml(e.reporter)}</span>` : ''}
           <span class="entry-date">${fmtDate(e.date)}</span>
         </div>
         ${actions}
@@ -1430,7 +1430,7 @@ function selectCategory(cat, autoCat) {
   if (cat !== autoCat) {
     correctionMade = true;
     const storeName = document.getElementById('fieldStore').value || '此店家';
-    cnote.innerHTML = `已記錄修正：<strong>${storeName}</strong> 系統原判斷為「${autoCat}」，已改為「${cat}」。同店家累積 3 次相同修正後，系統會提示更新自動判斷規則。`;
+    cnote.innerHTML = `已記錄修正：<strong>${escapeHtml(storeName)}</strong> 系統原判斷為「${escapeHtml(autoCat)}」，已改為「${escapeHtml(cat)}」。同店家累積 3 次相同修正後，系統會提示更新自動判斷規則。`;
     cnote.classList.add('show');
   } else {
     correctionMade = false;

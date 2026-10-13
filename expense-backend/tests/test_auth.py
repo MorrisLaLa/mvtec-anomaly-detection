@@ -303,4 +303,8 @@ def test_same_client_id_on_two_devices_does_not_overwrite_files(env):
         assert r.status_code == 200
     paths = [row[0] for row in conn.execute("SELECT receipt_path FROM expenses ORDER BY id")]
     assert len(set(paths)) == 2
-    assert open(paths[0], "rb").read() == img1 and open(paths[1], "rb").read() == img2
+    # M2 起存檔內容會重新編碼，位元組不同；改比對解碼後的像素，確認各自是自己的圖
+    import io as _io
+    from PIL import Image as _Image
+    px = lambda b: _Image.open(_io.BytesIO(b)).convert("RGB").tobytes()
+    assert px(open(paths[0], "rb").read()) == px(img1) and px(open(paths[1], "rb").read()) == px(img2)

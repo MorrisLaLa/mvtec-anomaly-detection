@@ -18,6 +18,13 @@ class Settings:
     auth_fail_limit: int = 10
     auth_fail_window_s: int = 900
     device_rate_per_min: int = 60
+    daily_submit_limit: int = 100
+    daily_upload_limit_bytes: int = 200 * 1024 * 1024
+    max_file_bytes: int = 5 * 1024 * 1024
+    max_request_bytes: int = 15 * 1024 * 1024
+    access_log_dir: str = "data/logs"
+    access_log_retention_days: int = 90
+    retention_days: int = 1825
 
 
 def load_settings() -> Settings:
@@ -34,8 +41,15 @@ def load_settings() -> Settings:
         auth_fail_limit=int((raw.get("auth") or {}).get("fail_limit", 10)),
         auth_fail_window_s=int((raw.get("auth") or {}).get("fail_window_seconds", 900)),
         device_rate_per_min=int((raw.get("auth") or {}).get("device_rate_per_min", 60)),
+        daily_submit_limit=int((raw.get("limits") or {}).get("daily_submit_limit", 100)),
+        daily_upload_limit_bytes=int((raw.get("limits") or {}).get("daily_upload_limit_mb", 200)) * 1024 * 1024,
+        max_file_bytes=int((raw.get("limits") or {}).get("max_file_mb", 5)) * 1024 * 1024,
+        max_request_bytes=int((raw.get("limits") or {}).get("max_request_mb", 15)) * 1024 * 1024,
+        access_log_dir=os.environ.get("EXPENSE_LOG_DIR", (raw.get("logging") or {}).get("access_log_dir", "data/logs")),
+        access_log_retention_days=int((raw.get("logging") or {}).get("retention_days", 90)),
+        retention_days=int((raw.get("retention") or {}).get("retention_days", 1825)),
     )
-    for attr in ("db_path", "storage_dir"):
+    for attr in ("db_path", "storage_dir", "access_log_dir"):
         p = Path(getattr(s, attr))
         if not p.is_absolute():
             setattr(s, attr, str(ROOT / p))

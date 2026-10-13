@@ -28,3 +28,20 @@ class LocalStorage(StorageBackend):
         p = d / f"{kind}{suffix}"
         p.write_bytes(data)
         return str(p)
+
+
+    def delete(self, path: str) -> bool:
+        """刪除儲存區內的檔案（路徑必須在儲存根目錄之下），並清掉空目錄。"""
+        p = Path(path).resolve()
+        if self.base.resolve() not in p.parents:
+            raise ValueError("path outside storage")
+        if not p.exists():
+            return False
+        p.unlink()
+        for parent in (p.parent, p.parent.parent):
+            try:
+                if parent != self.base.resolve():
+                    parent.rmdir()
+            except OSError:
+                break
+        return True

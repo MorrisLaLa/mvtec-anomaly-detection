@@ -6,8 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from . import database
+from .accesslog import AccessLog, AccessLogMiddleware
 from .auth import SlidingWindow
 from .config import Settings, load_settings
+from .limits import BodyLimitMiddleware
 from .ocr_provider import NullOCRProvider, OCRProvider
 from .routers import expenses
 from .storage import LocalStorage, StorageBackend
@@ -35,10 +37,14 @@ def create_app(
     app.state.ocr = ocr or NullOCRProvider()
     app.state.storage = storage or LocalStorage(settings.storage_dir)
     app.state.db_factory = lambda: database.connect(settings.db_path)
+    app.state.access_log = AccessLog(settings.access_log_dir, settings.access_log_retention_days)
     app.include_router(expenses.router, prefix="/api/v1")
     frontend = Path(__file__).resolve().parent.parent / "frontend"
     if frontend.is_dir():  # 同源提供 PWA，免 CORS
         app.mount("/pwa", StaticFiles(directory=frontend, html=True), name="pwa")
+    # 最外層依序：存取記錄（也記錄被擋下的請求）→ 請求大小限制 → 其餘
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_bytes, paths=("/api/v1/submit",))
+    app.add_middleware(AccessLogMiddleware, log_factory=lambda: (app.state.access_log, app.state.clock()))
     return app
 
 

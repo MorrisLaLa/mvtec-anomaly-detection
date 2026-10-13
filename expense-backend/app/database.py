@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     device_id INTEGER NOT NULL REFERENCES devices(id),
     client_id TEXT NOT NULL,
     payload_hash TEXT NOT NULL,
+    created_day TEXT NOT NULL DEFAULT '',
+    upload_bytes INTEGER NOT NULL DEFAULT 0,
     case_no TEXT,
     owner_case_no TEXT,
     doc_type TEXT,

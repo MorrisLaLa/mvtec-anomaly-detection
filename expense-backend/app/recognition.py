@@ -58,6 +58,8 @@ def parse_invoice_qr(image_bytes: bytes) -> dict | None:
         from pyzbar.pyzbar import ZBarSymbol, decode
 
         img = Image.open(io.BytesIO(image_bytes))
+        if img.width * img.height > 24_000_000:  # 與 M2 的像素上限一致，避免解碼超大圖
+            return None
         img.load()
         for sym in decode(img, symbols=[ZBarSymbol.QRCODE]):
             text = sym.data.decode("utf-8", errors="ignore")

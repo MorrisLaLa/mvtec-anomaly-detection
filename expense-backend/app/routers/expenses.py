@@ -10,12 +10,17 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .. import classify
+from datetime import datetime, timedelta, timezone
+
+from ..accesslog import taipei_day
 from ..auth import any_device, reviewer_only
+from ..imaging import ImageError, sanitize_image
+from ..limits import clean_text
 from ..recognition import extract_seller_tax_id, is_valid_tw_ubn, parse_invoice_qr
 from ..storage import is_safe_name
 
 router = APIRouter()
-MAX_UPLOAD = 10 * 1024 * 1024
+DOC_TYPES = {"", "統一發票", "收據", "無單據"}
 NO_RECEIPT_LIMIT = 1000
 
 
@@ -95,6 +100,22 @@ async def submit(
     st = request.app.state
     if not is_safe_name(client_id):
         raise HTTPException(422, "client_id 只能包含英數字、_、-（最長64）")
+    # M2：文字欄位長度上限；移除控制字元
+    case_no, owner_case_no = clean_text(case_no).strip(), clean_text(owner_case_no).strip()
+    store, category = clean_text(store).strip(), clean_text(category).strip()
+    suggested_category, note = clean_text(suggested_category).strip(), clean_text(note, newlines=True).strip()
+    doc_type, expense_date = clean_text(doc_type).strip(), clean_text(expense_date).strip()
+    for name, value, limit in (("case_no", case_no, 50), ("owner_case_no", owner_case_no, 50), ("store", store, 100),
+                               ("category", category, 30), ("suggested_category", suggested_category, 30), ("note", note, 500)):
+        if len(value) > limit:
+            raise HTTPException(422, f"{name} 最長 {limit} 字")
+    if doc_type not in DOC_TYPES:
+        raise HTTPException(422, "doc_type 只能是 統一發票、收據、無單據")
+    if expense_date:
+        try:
+            datetime.strptime(expense_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(422, "expense_date 必須是 YYYY-MM-DD")
     seller_tax_id = seller_tax_id.strip()
     if seller_tax_id and not re.fullmatch(r"[0-9]{8}", seller_tax_id):
         raise HTTPException(422, "seller_tax_id 必須為8碼數字")
@@ -104,11 +125,14 @@ async def submit(
             raise HTTPException(422, "amount 必須為正整數")
         amount_val = int(amount)
 
-    receipt_bytes = (await receipt.read(MAX_UPLOAD + 1)) if receipt else b""
-    signature_bytes = (await signature.read(MAX_UPLOAD + 1)) if signature else b""
-    voucher_bytes = (await voucher.read(MAX_UPLOAD + 1)) if voucher else b""
-    if max(len(receipt_bytes), len(signature_bytes), len(voucher_bytes)) > MAX_UPLOAD:
-        raise HTTPException(413, "檔案過大")
+    limit = st.settings.max_file_bytes
+    receipt_bytes = (await receipt.read(limit + 1)) if receipt is not None else b""
+    signature_bytes = (await signature.read(limit + 1)) if signature is not None else b""
+    voucher_bytes = (await voucher.read(limit + 1)) if voucher is not None else b""
+    if max(len(receipt_bytes), len(signature_bytes), len(voucher_bytes)) > limit:
+        raise HTTPException(413, f"單一檔案不可超過 {limit // (1024 * 1024)} MB")
+    has = {"receipt": receipt is not None, "signature": signature is not None, "voucher": voucher is not None}
+    upload_bytes = len(receipt_bytes) + len(signature_bytes) + len(voucher_bytes)
 
     # 冪等：同一裝置 + 同一 client_id；內容相同 → 回傳既有結果，內容不同 → 409
     payload_hash = hashlib.sha256(json.dumps({
@@ -122,6 +146,26 @@ async def submit(
         if existing["payload_hash"] != payload_hash:
             raise HTTPException(409, "client_id 已用於內容不同的申報")
         return _response(existing, duplicate=True)
+
+    # M2：每裝置每日上限（台北時間）。重送（上面已回傳）不佔額度
+    now = st.clock()
+    day = taipei_day(now)
+    used = db.execute("SELECT COUNT(*), COALESCE(SUM(upload_bytes), 0) FROM expenses WHERE device_id=? AND created_day=?",
+                      (device["id"], day)).fetchone()
+    if used[0] >= st.settings.daily_submit_limit or used[1] + upload_bytes > st.settings.daily_upload_limit_bytes:
+        taipei_now = now.astimezone(timezone.utc).replace(tzinfo=None) + timedelta(hours=8)
+        wait = max(60, int((datetime.fromisoformat(day) + timedelta(days=1) - taipei_now).total_seconds()))
+        raise HTTPException(429, "已達今日上傳上限，請明天再送", headers={"Retry-After": str(wait)})
+
+    # M2：以內容驗證圖片並重新編碼（移除 EXIF）；副檔名依實際格式
+    clean: dict[str, tuple[bytes, str]] = {}
+    for kind, raw in (("receipt", receipt_bytes), ("signature", signature_bytes), ("voucher", voucher_bytes)):
+        if has[kind]:
+            try:
+                clean[kind] = sanitize_image(raw)
+            except ImageError as e:
+                raise HTTPException(422, f"{kind}：{e}")
+    receipt_bytes = clean["receipt"][0] if "receipt" in clean else b""
 
     reasons: list[str] = []
     rec = {"source": "none", "confidence": None, "reason": None}
@@ -173,12 +217,13 @@ async def submit(
 
     spath = rpath = vpath = None
     try:
-        if receipt_bytes:
-            rpath = st.storage.save(client_id, "receipt", receipt_bytes, namespace=f"d{device['id']}")
-        if signature_bytes:
-            spath = st.storage.save(client_id, "signature", signature_bytes, namespace=f"d{device['id']}")
-        if voucher_bytes:
-            vpath = st.storage.save(client_id, "voucher", voucher_bytes, namespace=f"d{device['id']}")
+        ns = f"d{device['id']}"
+        if "receipt" in clean:
+            rpath = st.storage.save(client_id, "receipt", clean["receipt"][0], suffix=clean["receipt"][1], namespace=ns)
+        if "signature" in clean:
+            spath = st.storage.save(client_id, "signature", clean["signature"][0], suffix=clean["signature"][1], namespace=ns)
+        if "voucher" in clean:
+            vpath = st.storage.save(client_id, "voucher", clean["voucher"][0], suffix=clean["voucher"][1], namespace=ns)
     except ValueError:
         raise HTTPException(422, "檔名不合法")
 
@@ -186,7 +231,7 @@ async def submit(
     try:
         _insert_expense(db, device, payload_hash, client_id, case_no, owner_case_no, doc_type, amount_val, expense_date,
                         store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec,
-                        rec_note, needs_review, rpath, spath, vpath, note)
+                        rec_note, needs_review, rpath, spath, vpath, note, day, upload_bytes)
     except sqlite3.IntegrityError:
         # 同一裝置同一 client_id 的請求幾乎同時抵達：另一個已寫入，回傳既有結果（內容不同則 409）
         existing = db.execute("SELECT * FROM expenses WHERE device_id=? AND client_id=?", (device["id"], client_id)).fetchone()
@@ -204,17 +249,17 @@ async def submit(
 
 def _insert_expense(db, device, payload_hash, client_id, case_no, owner_case_no, doc_type, amount_val, expense_date,
                     store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec,
-                    rec_note, needs_review, rpath, spath, vpath, note):
+                    rec_note, needs_review, rpath, spath, vpath, note, created_day, upload_bytes):
     db.execute(
         """INSERT INTO expenses(device_id, payload_hash, client_id, case_no, owner_case_no, doc_type, employee, amount,
            expense_date, store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, category, category_source,
            category_confidence, recognition_source, recognition_confidence, recognition_note, needs_review,
-           receipt_path, signature_path, voucher_path, note)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           receipt_path, signature_path, voucher_path, note, created_day, upload_bytes)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (device["id"], payload_hash, client_id, case_no.strip() or None, owner_case_no.strip() or None,
          doc_type.strip() or None, device["name"], amount_val, expense_date or invoice_date, store,
          seller_tax_id or None, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec["source"],
-         rec["confidence"], rec_note, needs_review, rpath, spath, vpath, note),
+         rec["confidence"], rec_note, needs_review, rpath, spath, vpath, note, created_day, upload_bytes),
     )
     db.commit()
 
