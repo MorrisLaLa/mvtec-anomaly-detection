@@ -45,7 +45,7 @@ def setup_pin(page):
 
 
 def submit_no_receipt(page, amount, store):
-    page.click("#homeActionBar button:has-text('無單據')")
+    page.click("#homeActionBar button:has-text('沒有收據')")
     page.fill("#fieldAmount", str(amount))
     page.fill("#fieldStore", store)
     page.click("#categoryChips .chip:text-is('餐飲雜支')")
@@ -57,14 +57,14 @@ def test_submitter_flow_auto_approve_held_and_wifi_simulation(page):
     page.wait_for_selector("#screen-onboarding", state="visible")
     setup_pin(page)
     submit_no_receipt(page, 300, "便當店")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     submit_no_receipt(page, 1500, "零星採買")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=待審核")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
     page.click("button[data-net='cellular']")  # 切到行動網路
     submit_no_receipt(page, 120, "飲料店")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     page.click("button[data-net='wifi']")  # 回到 Wi-Fi 自動上傳
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     assert page.errors == []
 
 
@@ -73,9 +73,9 @@ def test_server_offline_then_recovers(page):
     setup_pin(page)
     page.click("button[data-srv='offline']")
     submit_no_receipt(page, 200, "離線測試")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=待同步")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待送出")
     page.click("button[data-srv='ok']")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄", timeout=20000)
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出", timeout=20000)
 
 
 def test_429_and_duplicate_rejection_show_reasons(page):
@@ -88,15 +88,15 @@ def test_429_and_duplicate_rejection_show_reasons(page):
     page.click("#entryList .entry >> nth=0 >> button:has-text('刪除')")
     # 統一發票：同店同金額送兩次 → 第二次判重複退回
     for _ in range(2):
-        page.click("#homeActionBar button:has-text('拍照申報')")
+        page.click("#homeActionBar button:has-text('拍收據')")
         page.wait_for_selector("#screen-review", state="visible")
         page.click(".btn-submit")
         page.wait_for_selector("#screen-home", state="visible")
         page.wait_for_timeout(1500)
-        page.wait_for_function("!document.querySelector('#entryList .entry').innerText.includes('待同步')")
+        page.wait_for_function("!document.querySelector('#entryList .entry').innerText.includes('等待送出')")
         # 第二圈用同一筆示範單據：把游標指回第一筆
         page.evaluate("receiptCursor = 0")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已退回：重複報銷")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=這張被退回：這張發票已經報過了")
 
 
 def test_reviewer_sees_seeded_queue_and_can_approve_and_reject(page):

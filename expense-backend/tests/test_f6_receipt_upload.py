@@ -42,7 +42,7 @@ def test_inputs_are_real_file_inputs_with_camera_hint(server, page):
     assert page.get_attribute("#capAlbum", "accept") == "image/*" and page.get_attribute("#capAlbum", "capture") is None
     # 按鈕確實會開啟選檔（檔案選擇視窗）
     with page.expect_file_chooser() as fc:
-        page.click("#homeActionBar button:has-text('相簿上傳')")
+        page.click("#homeActionBar button:has-text('從相簿選')")
     assert fc.value.is_multiple() is False
 
 
@@ -51,7 +51,7 @@ def test_photo_with_valid_qr_amount_blank_is_filled_by_server_and_auto_approved(
     pick(page, invoice(total=210))
     assert page.is_visible("#receiptThumb img")  # 顯示所選照片的縮圖
     finish(page)  # 金額留空：以發票 QR 為準
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     assert "NT$ 210" in page.inner_text("#entryList .entry >> nth=0")  # 伺服器回填的金額
     r = row(server)[0]
     assert r[1] == 210 and r[2] == "04541302" and r[3].startswith("ZX") and r[4] == "qr" and r[5] == "high"
@@ -62,9 +62,9 @@ def test_same_invoice_twice_is_rejected_as_duplicate_with_reason(server, page):
     login(page, server)
     data = invoice(total=300, no="ZX55550001")
     pick(page, data); finish(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     pick(page, data); finish(page, store="另一個店名")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已退回：重複報銷")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=這張被退回：這張發票已經報過了")
     assert [r[6] for r in row(server)] == ["approved", "rejected"]
 
 
@@ -73,7 +73,7 @@ def test_photo_without_qr_goes_to_human_review(server, page):
     pick(page, png(), name="blank.png")  # 沒有 QR 的照片
     page.click("#docTypeChips .chip:text-is('收據')")
     finish(page, amount=180)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=待審核")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
     r = row(server)[0]
     assert r[1] == 180 and r[2] is None and r[4] == "ocr" and r[6] == "held" and r[8] == "收據"
 
@@ -102,7 +102,7 @@ def test_receipt_photo_waits_for_wifi_like_other_data(server, page):
     login(page, server, policy=None, init_script=CELLULAR)
     pick(page, invoice(total=210))
     finish(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     page.wait_for_timeout(1200)
     assert posts == [] and row(server) == []
     page.evaluate("window.__setNet('wifi')")
@@ -117,7 +117,7 @@ def test_receipt_upload_is_compressed_before_sending(server, page):
     big = invoice(total=210)
     pick(page, big)
     finish(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     assert sizes and sizes[0] < 60 * 1024  # 單張收據請求遠小於 60KB
 
 
@@ -134,7 +134,7 @@ def test_large_camera_photo_is_downscaled_to_jpeg_and_qr_still_decodes(server, p
     login(page, server)
     pick(page, buf.getvalue(), name="IMG_0001.jpg", mime="image/jpeg")
     finish(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄", timeout=20000)
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出", timeout=20000)
     r = row(server)[0]
     assert r[1] == 410 and r[4] == "qr" and r[6] == "approved" and r[7].endswith(".jpg")
     from PIL import Image as I

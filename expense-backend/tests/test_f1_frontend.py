@@ -59,7 +59,7 @@ def test_401_is_not_auto_retried_then_rebind_and_manual_resend(server, page):
     page.wait_for_selector("#screen-home", state="visible")
     assert len(calls) == 1  # 綁定本身也不會自動重送
     page.click("#entryList .entry >> nth=0 >> button:has-text('重送')")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     assert len(rows(server)) == 1
 
 
@@ -82,7 +82,7 @@ def test_429_shows_wait_time_and_needs_manual_resend(server, page):
     assert len(calls) == 1
     state["block"] = False
     page.click("#entryList .entry >> nth=0 >> button:has-text('重送')")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     assert len(rows(server)) == 1
 
 
@@ -109,13 +109,13 @@ def test_cellular_holds_upload_then_wifi_uploads_automatically(server, page):
     calls = count_submits(page)
     login(page, server, policy=None, init_script=CELLULAR)
     submit_no_receipt(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     time.sleep(0.8)
     assert len(calls) == 0 and rows(server) == []  # 行動網路下完全沒有送出請求
     assert page.evaluate("ExpenseSync.pending()") == 1 and page.evaluate("ExpenseSync.failed()") == []
     page.evaluate("window.__setNet('wifi')")  # 連上 Wi-Fi
     wait_pending_zero(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已記錄")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     assert len(rows(server)) == 1
 
 
@@ -138,7 +138,7 @@ def test_unsupported_api_uses_manual_upload(server, page):  # iPhone 情境
 def test_per_item_cellular_override_sends_only_that_item(server, page):
     login(page, server, policy=None, init_script=CELLULAR)
     submit_no_receipt(page, store="甲")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     submit_no_receipt(page, store="乙")
     page.wait_for_selector("#entryList .entry >> nth=0 >> button:has-text('本筆改用行動網路上傳')")
     page.once("dialog", lambda d: d.accept())
@@ -154,7 +154,7 @@ def test_per_item_cellular_override_sends_only_that_item(server, page):
 def test_policy_any_uploads_on_cellular(server, page):
     login(page, server, policy=None, init_script=CELLULAR)
     submit_no_receipt(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     page.uncheck("#wifiOnly")  # 改為不限網路
     wait_pending_zero(page)
     assert len(rows(server)) == 1
@@ -164,7 +164,7 @@ def test_waiting_for_wifi_is_not_a_failure_and_starts_no_retry_timer(server, pag
     calls = count_submits(page)
     login(page, server, policy=None, init_script=CELLULAR, retry_ms=200)
     submit_no_receipt(page)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     time.sleep(1.5)  # 若誤啟動遞增重試，這段時間內會再送
     assert len(calls) == 0 and "送出失敗" not in page.inner_text("#entryList")
 
@@ -230,7 +230,7 @@ def test_images_are_not_transmitted_on_cellular_and_sizes_are_small_on_wifi(serv
     page.on("request", lambda r: api_calls.append(r.url) if "/api/" in r.url else None)
     login(page, server, policy=None, init_script=CELLULAR)
     submit_no_receipt(page, sign=True)  # 含簽名圖與合成的憑證圖
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
     time.sleep(1.5)
     assert posts == [] and api_calls == []  # 行動網路下，沒有任何 POST，也沒有任何對 API 的連線
     assert page.evaluate("ExpenseSync.pending()") == 1

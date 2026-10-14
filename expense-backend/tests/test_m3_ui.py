@@ -74,7 +74,7 @@ def test_review_screen_escapes_malicious_store_name(server, page):
 def test_my_rejected_submission_shows_reason(server, page):
     login(page, server)
     submit_no_receipt(page, amount="1500")  # 無單據 >1000 → 轉人工
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=待審核")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
     rk = server.new_device("陳主管", "reviewer")
     import sqlite3
     cid = server.query("SELECT id FROM expenses")[0][0]
@@ -82,4 +82,4 @@ def test_my_rejected_submission_shows_reason(server, page):
                headers={"Authorization": f"Bearer {rk}"}).raise_for_status()
     # 自動重複報銷：另一張相同發票會直接被退回並顯示原因（API 層已由 test_m3 覆蓋）；此處驗證前台能顯示退回狀態
     page.evaluate("""() => { const e = entries[0]; e.status = 'rejected'; e.reviewReasons = ['重複報銷：這張發票已經有申報']; renderHome(); }""")
-    assert "已退回：重複報銷" in page.inner_text("#entryList .entry >> nth=0")
+    assert "這張被退回：這張發票已經報過了" in page.inner_text("#entryList .entry >> nth=0")

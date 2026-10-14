@@ -402,8 +402,11 @@
     padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
     background: linear-gradient(180deg, transparent, var(--paper) 26%);
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
   }
+  .action-bar .btn-primary { flex: 1 1 100%; min-height: 64px; font-size: 20px; }
+  .action-bar .btn-secondary { flex: 1 1 0; min-height: 48px; font-size: 16px; }
   .btn {
     border: none;
     border-radius: 14px;
@@ -915,14 +918,14 @@
   <div class="action-bar" id="homeActionBar">
     <button class="btn btn-primary" onclick="startCapture('photo')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.6A2 2 0 0 1 9.85 3.4h4.3a2 2 0 0 1 1.75 1l.9 1.6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="12.5" r="3.6"/></svg>
-      拍照申報
+      拍收據
     </button>
     <button class="btn btn-secondary" onclick="startCapture('album')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><path d="M3.5 15.5 8 11l3 3 4-4.5 5.5 6"/></svg>
-      相簿上傳
+      從相簿選
     </button>
-    <button class="btn btn-secondary" style="flex:0.85" onclick="startNoReceipt()">
-      無單據
+    <button class="btn btn-secondary" onclick="startNoReceipt()">
+      沒有收據
     </button>
   </div>
 
@@ -1008,7 +1011,7 @@
 
       <div class="field-group">
         <div class="field-label">
-          <span>分類</span>
+          <span>用途</span>
         </div>
         <div class="chip-row" id="categoryChips"></div>
         <div class="auto-note" id="categoryAutoNote"></div>
@@ -1016,9 +1019,9 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">案號</div>
+        <div class="field-label">工程案件</div>
         <div class="case-select" onclick="openCaseSheet(true)">
-          <span class="case-select-text" id="reviewCaseLabel">UY2301<small>公司案號 / 業主案號</small></span>
+          <span class="case-select-text" id="reviewCaseLabel">UY2301<small>點一下可更換</small></span>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </div>
       </div>
@@ -1071,8 +1074,8 @@
 
 <!-- Voucher viewer -->
 <div class="voucher-overlay" id="voucherOverlay" onclick="closeVoucherViewer(event)">
-  <img id="voucherImg" src="" alt="支出憑證">
-  <div class="voucher-hint">金額、日期、案號與簽名已合併存證於同一張憑證</div>
+  <img id="voucherImg" src="" alt="簽收單">
+  <div class="voucher-hint">金額、日期、工程案件與簽名已合併存證於同一張簽收單</div>
   <button class="voucher-close" onclick="closeVoucherViewer(event)">關閉</button>
 </div>
 
@@ -1081,7 +1084,7 @@
 <div class="sheet" id="caseSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-title">選擇案件</div>
-  <div class="sheet-sub">公司案號在前，業主案號在後 · 最近使用排前面</div>
+  <div class="sheet-sub">最近使用的排在前面</div>
   <div id="caseOptions"></div>
 </div>
 
@@ -1126,7 +1129,7 @@ let selectedDocType = '統一發票';   // 有照片時由使用者選擇；送�
 let entries = [
   { store: '永昌五金行', amount: 620, category: '五金材料', case: CASES[0], date: daysAgo(1), type: '統一發票', status: 'ok' },
   { store: '中油 二仁溪站', amount: 980, category: '交通油料', case: CASES[0], date: daysAgo(2), type: '統一發票', status: 'ok' },
-  { store: '無單據 — 現場零星採買', amount: 150, category: '待分類', case: CASES[0], date: daysAgo(3), type: '無單據', status: 'ok' },
+  { store: '現場零星採買（沒有收據）', amount: 150, category: '待分類', case: CASES[0], date: daysAgo(3), type: '無單據', status: 'ok' },
 ];
 
 let currentReceipt = null; // receipt being reviewed
@@ -1311,12 +1314,12 @@ function renderHome() {
     const statusTag = e.status === 'failed'
       ? `<span class="tag tag-review">${escapeHtml(failText(e))}</span>`
       : e.status === 'waiting-wifi'
-      ? `<span class="tag tag-pending">${ExpenseSync.networkKind() === 'unsupported' ? '待上傳（請在 Wi‑Fi 下按「立即上傳」）' : '等待 Wi‑Fi'}</span>`
+      ? `<span class="tag tag-pending">${ExpenseSync.networkKind() === 'unsupported' ? '等 Wi‑Fi（請在 Wi‑Fi 下按「立即上傳」）' : '等 Wi‑Fi（省流量）'}</span>`
       : e.status === 'rejected'
-      ? `<span class="tag tag-review">已退回：${escapeHtml((e.reviewReasons || []).join('；') || '請洽管理員')}</span>`
+      ? `<span class="tag tag-review">這張被退回：${escapeHtml(friendlyReasons(e.reviewReasons))}</span>`
       : e.status === 'pending-sync'
-      ? '<span class="tag tag-pending">待同步</span>'
-      : (e.status === 'review' ? '<span class="tag tag-review">待審核</span>' : '<span class="tag tag-ok">已記錄</span>');
+      ? '<span class="tag tag-pending">等待送出</span>'
+      : (e.status === 'review' ? '<span class="tag tag-review">主管確認中</span>' : '<span class="tag tag-ok">已送出</span>');
     const actions = e.status === 'failed'
       ? `<div class="entry-actions">${e.failStatus === 401 ? `<button class="mini-btn" onclick="rebindDevice(event)">重新綁定</button>` : ''}<button class="mini-btn" onclick="resendEntry('${e.clientId}', event)">重送</button><button class="mini-btn danger" onclick="deleteFailedEntry('${e.clientId}', event)">刪除</button></div>`
       : e.status === 'waiting-wifi'
@@ -1333,7 +1336,7 @@ function renderHome() {
           <span class="tag tag-case">${escapeHtml(e.case.company)}</span>
           <span class="tag tag-cat">${escapeHtml(e.category)}</span>
           ${statusTag}
-          ${e.signed ? '<span class="tag tag-cat">已簽收憑證</span>' : ''}
+          ${e.signed ? '<span class="tag tag-cat">已簽收</span>' : ''}
           ${e.reporter ? `<span class="tag tag-user">${escapeHtml(e.reporter)}</span>` : ''}
           <span class="entry-date">${fmtDate(e.date)}</span>
         </div>
@@ -1401,7 +1404,7 @@ function openReview() {
   const typeSub = document.getElementById('receiptTypeSub');
   const thumb = document.getElementById('receiptThumb');
   if (r.isNoReceipt) {
-    typeLabel.textContent = '無單據申報';
+    typeLabel.textContent = '沒有收據';
     typeSub.textContent = '請填寫店家、金額與用途';
     thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></svg>`;
   } else if (r.file) {
@@ -1410,11 +1413,11 @@ function openReview() {
     thumb.innerHTML = `<img src="${r.previewUrl}" alt="單據照片" style="width:100%;height:100%;object-fit:cover;border-radius:7px;">`;
   } else if (r.hasTax) {
     typeLabel.textContent = '統一發票';
-    typeSub.textContent = '已辨識統一編號，屬有效憑證';
+    typeSub.textContent = '已辨識統一編號，屬有效發票';
     thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/></svg>`;
   } else {
     typeLabel.textContent = '收據';
-    typeSub.textContent = '未辨識統一編號，屬非發票憑證';
+    typeSub.textContent = '未辨識統一編號，屬一般收據';
     thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/><path d="M9 12h6M9 15h4" stroke-dasharray="1.5 2"/></svg>`;
   }
 
@@ -1469,13 +1472,13 @@ function renderCategoryChips(auto, confidence) {
   const note = document.getElementById('categoryAutoNote');
   if (confidence === 'high') {
     note.className = 'auto-note';
-    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg> 系統依店家名稱自動判斷，如不正確請直接點選其他分類`;
+    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg> 系統依店家名稱自動判斷，如不正確請直接點選其他用途`;
   } else if (confidence === 'mid') {
     note.className = 'auto-note';
     note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg> 系統初步判斷，信心度中等，請確認一下`;
   } else {
     note.className = 'auto-note warn';
-    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg> 系統無法自動判斷，請手動選擇一個分類`;
+    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg> 系統無法自動判斷，請手動選擇一個用途`;
   }
 }
 function selectCategory(cat, autoCat) {
@@ -1488,7 +1491,7 @@ function selectCategory(cat, autoCat) {
   if (cat !== autoCat) {
     correctionMade = true;
     const storeName = document.getElementById('fieldStore').value || '此店家';
-    cnote.innerHTML = `已記錄修正：<strong>${escapeHtml(storeName)}</strong> 系統原判斷為「${escapeHtml(autoCat)}」，已改為「${escapeHtml(cat)}」。同店家累積 3 次相同修正後，系統會提示更新自動判斷規則。`;
+    cnote.innerHTML = `已記下你的修正：<strong>${escapeHtml(storeName)}</strong> 系統原判斷為「${escapeHtml(autoCat)}」，已改為「${escapeHtml(cat)}」。同店家累積 3 次相同修正後，系統會提示更新自動判斷規則。`;
     cnote.classList.add('show');
   } else {
     correctionMade = false;
@@ -1501,7 +1504,7 @@ function checkThreshold() {
   const banner = document.getElementById('thresholdBanner');
   const amt = parseInt(document.getElementById('fieldAmount').value || '0', 10);
   if (currentReceipt && currentReceipt.isNoReceipt && amt > 1000) {
-    banner.textContent = `無單據金額超過 NT$1,000 門檻，此筆將標記為「待主管審核」`;
+    banner.textContent = `沒有收據的金額超過 NT$1,000，此筆會由主管確認`;
     banner.classList.add('show');
   } else {
     banner.classList.remove('show');
@@ -1739,7 +1742,7 @@ function runSync() {
   return ExpenseSync.flush().catch(() => {});
 }
 function syncNow() {
-  if (!pendingCount) { showToast('沒有待同步的資料'); return; }
+  if (!pendingCount) { showToast('沒有等待送出的資料'); return; }
   if (!ExpenseSync.autoAllowed()) { // 非 Wi‑Fi：使用者明確要求才上傳
     const msg = ExpenseSync.networkKind() === 'unsupported'
       ? '請確認目前已連上 Wi‑Fi，再上傳這些資料。要上傳嗎？'
@@ -1751,6 +1754,11 @@ function syncNow() {
   runSync();
 }
 
+function friendlyReasons(rs) {
+  // 伺服器的退回原因轉成現場看得懂的話（不顯示系統代碼）
+  const out = (rs || []).map(r => /^重複報銷/.test(r) ? '這張發票已經報過了' : r);
+  return out.join('；') || '請洽管理員';
+}
 function failText(e) {
   if (e.failStatus === 401) return '裝置未授權，請重新綁定';
   if (e.failStatus === 429) return `請求太頻繁，請約 ${Math.max(1, Math.ceil((e.retryAfter || 60) / 60))} 分鐘後再送`;
@@ -1917,8 +1925,8 @@ function onSyncFlush(r) {
     showToast(failText({ failStatus: r.failed[0].status, retryAfter: r.failed[0].retryAfter, failMessage: r.failed[0].message }));
   } else if (r.sent === 1) {
     const e = entries.find(x => x.clientId === Object.keys(r.results)[0]);
-    if (e && e.status === 'rejected') showToast('已退回：' + (e.reviewReasons || []).join('；'));
-    else showToast(e && e._wasReview ? '已送出，待主管審核' : (e && e._signed ? '申報已送出（含簽收憑證）' : '申報已送出'));
+    if (e && e.status === 'rejected') showToast('這張被退回：' + friendlyReasons(e.reviewReasons));
+    else showToast(e && e._wasReview ? '已送出，主管確認中' : (e && e._signed ? '申報已送出（含簽收單）' : '申報已送出'));
   } else if (r.sent > 1) {
     showToast(`已同步 ${r.sent} 筆資料`);
   }
@@ -1931,8 +1939,8 @@ function updateNetUI() {
   if (heldKind && pendingCount) {
     strip.classList.add('offline');
     label.textContent = heldKind === 'unsupported'
-      ? `待上傳 ${pendingCount} 筆 · 請在 Wi‑Fi 下按此處「立即上傳」`
-      : `等待 Wi‑Fi · ${pendingCount} 筆待上傳`;
+      ? `等 Wi‑Fi · ${pendingCount} 筆 · 連上 Wi‑Fi 後按此處「立即上傳」`
+      : `等 Wi‑Fi（省流量）· ${pendingCount} 筆等待送出`;
     return;
   }
   if (!offline) {
@@ -1940,7 +1948,7 @@ function updateNetUI() {
     label.textContent = pendingCount ? `線上 · 正在同步 ${pendingCount} 筆資料` : '線上 · 資料即時同步';
   } else {
     strip.classList.add('offline');
-    label.textContent = pendingCount ? `離線 · ${pendingCount} 筆待同步` : '離線 · 拍照與簽名仍可正常記錄';
+    label.textContent = pendingCount ? `沒有網路 · ${pendingCount} 筆等待送出` : '離線 · 拍照與簽名仍可正常記錄';
   }
 }
 
