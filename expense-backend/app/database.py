@@ -17,6 +17,13 @@ CREATE TABLE IF NOT EXISTS expenses (
     device_id INTEGER NOT NULL REFERENCES devices(id),
     client_id TEXT NOT NULL,
     payload_hash TEXT NOT NULL,
+    review_status TEXT NOT NULL DEFAULT 'held',
+    reviewed_by TEXT,
+    reviewed_at TEXT,
+    review_reasons TEXT,
+    review_comment TEXT,
+    review_rule_version TEXT,
+    sampled INTEGER NOT NULL DEFAULT 0,
     created_day TEXT NOT NULL DEFAULT '',
     upload_bytes INTEGER NOT NULL DEFAULT 0,
     case_no TEXT,
@@ -44,6 +51,23 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (device_id, client_id)
 );
+CREATE TABLE IF NOT EXISTS review_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    expense_id INTEGER NOT NULL,
+    event TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    actor_device_id INTEGER,
+    from_status TEXT,
+    to_status TEXT,
+    comment TEXT,
+    rule_version TEXT,
+    self_review INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS review_events_no_update BEFORE UPDATE ON review_events
+BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS review_events_no_delete BEFORE DELETE ON review_events
+BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
 CREATE TABLE IF NOT EXISTS vendors (
     tax_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

@@ -25,6 +25,12 @@ class Settings:
     access_log_dir: str = "data/logs"
     access_log_retention_days: int = 90
     retention_days: int = 1825
+    review_rule_version: str = "v1"
+    review_max_amount: int = 5000
+    review_max_age_days: int = 90
+    review_monthly_cap: int = 30000
+    review_sample_percent: int = 10
+    review_no_receipt_limit: int = 1000
 
 
 def load_settings() -> Settings:
@@ -48,6 +54,12 @@ def load_settings() -> Settings:
         access_log_dir=os.environ.get("EXPENSE_LOG_DIR", (raw.get("logging") or {}).get("access_log_dir", "data/logs")),
         access_log_retention_days=int((raw.get("logging") or {}).get("retention_days", 90)),
         retention_days=int((raw.get("retention") or {}).get("retention_days", 1825)),
+        review_rule_version=str((raw.get("review") or {}).get("rule_version", "v1")),
+        review_max_amount=int((raw.get("review") or {}).get("max_amount", 5000)),
+        review_max_age_days=int((raw.get("review") or {}).get("max_age_days", 90)),
+        review_monthly_cap=int((raw.get("review") or {}).get("monthly_cap", 30000)),
+        review_sample_percent=int((raw.get("review") or {}).get("sample_percent", 10)),
+        review_no_receipt_limit=int((raw.get("review") or {}).get("no_receipt_limit", 1000)),
     )
     for attr in ("db_path", "storage_dir", "access_log_dir"):
         p = Path(getattr(s, attr))

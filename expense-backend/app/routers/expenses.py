@@ -5,7 +5,7 @@ import json
 import re
 import sqlite3
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..accesslog import taipei_day
 from ..auth import any_device, reviewer_only
+from .. import review as review_engine
 from ..imaging import ImageError, sanitize_image
 from ..limits import clean_text
 from ..recognition import extract_seller_tax_id, is_valid_tw_ubn, parse_invoice_qr
@@ -171,6 +172,7 @@ async def submit(
     rec = {"source": "none", "confidence": None, "reason": None}
     qr: dict | None = None
     rec_note = None
+    amount_mismatch = False
 
     if seller_tax_id:
         rec = {"source": "manual", "confidence": None, "reason": None}
@@ -192,6 +194,7 @@ async def submit(
         if amount_val is None:
             amount_val = qr["amount"]
         elif amount_val != qr["amount"]:
+            amount_mismatch = True
             reasons.append(f"填寫金額 {amount_val} 與發票 QR 金額 {qr['amount']} 不符")
     if amount_val is None:
         raise HTTPException(422, "amount 必填（或需上傳可辨識的電子發票 QR）")
@@ -228,6 +231,11 @@ async def submit(
         raise HTTPException(422, "檔名不合法")
 
     needs_review = 1 if reasons else 0
+    decision = review_engine.decide(db, st.settings, now, device, client_id, {
+        "amount": amount_val, "doc_type": doc_type, "category": cat, "rec_source": rec["source"],
+        "rec_conf": rec["confidence"], "invoice_no": invoice_no, "invoice_date": invoice_date,
+        "expense_date": expense_date or invoice_date, "seller_tax_id": seller_tax_id or None,
+        "buyer_tax_id": buyer_tax_id, "amount_mismatch": amount_mismatch})
     try:
         _insert_expense(db, device, payload_hash, client_id, case_no, owner_case_no, doc_type, amount_val, expense_date,
                         store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec,
@@ -240,6 +248,19 @@ async def submit(
         if existing["payload_hash"] != payload_hash:
             raise HTTPException(409, "client_id 已用於內容不同的申報")
         return _response(existing, duplicate=True)
+    cfg = st.settings
+    db.execute("""UPDATE expenses SET review_status=?, reviewed_by=?, reviewed_at=?, review_reasons=?, review_rule_version=?,
+                   sampled=? WHERE device_id=? AND client_id=?""",
+               (decision["status"], f"auto:{cfg.review_rule_version}" if decision["status"] != "held" else None,
+                now.strftime("%Y-%m-%dT%H:%M:%SZ") if decision["status"] != "held" else None,
+                review_engine.reasons_json(decision["reasons"]), cfg.review_rule_version, int(decision["sampled"]),
+                device["id"], client_id))
+    new_id = db.execute("SELECT id FROM expenses WHERE device_id=? AND client_id=?", (device["id"], client_id)).fetchone()[0]
+    review_engine.add_event(db, new_id, "auto_decision" if decision["status"] != "held" else "held",
+                            f"auto:{cfg.review_rule_version}", to_status=decision["status"],
+                            comment="；".join(decision["reasons"]) or None, rule_version=cfg.review_rule_version, now=now)
+    db.commit()
+    reasons = reasons + [r for r in decision["reasons"] if r not in reasons]
     if suggested_category.strip() and cat_src == "user":
         classify.record_correction(store, suggested_category.strip(), cat, conn=db)
 
@@ -280,7 +301,8 @@ def _response(row, duplicate=False, recognition=None, reasons=None):
         "category_confidence": row["category_confidence"],
         "recognition": rec,
         "needs_review": bool(row["needs_review"]),
-        "review_reasons": reasons or [],
+        "review_status": row["review_status"],
+        "review_reasons": reasons if reasons is not None else json.loads(row["review_reasons"] or "[]"),
     }
 
 
@@ -301,13 +323,31 @@ def confirm(body: RuleConfirm, device=reviewer_only, db=Depends(get_db)):
     return {"ok": True}
 
 
+EXPORT_COLUMNS = ["id", "client_id", "case_no", "owner_case_no", "doc_type", "employee", "amount", "expense_date", "store",
+                  "seller_tax_id", "buyer_tax_id", "invoice_no", "invoice_date", "category", "category_source",
+                  "recognition_source", "recognition_confidence", "needs_review", "review_status", "reviewed_by",
+                  "reviewed_at", "review_reasons", "review_comment", "sampled", "created_day"]
+
+
 @router.get("/export")
-def export(device=reviewer_only, db=Depends(get_db)):
-    rows = db.execute("SELECT * FROM expenses ORDER BY id").fetchall()
+def export(request: Request, status: str = "", from_: str = Query("", alias="from"), to: str = "", case_no: str = "",
+           device=reviewer_only, db=Depends(get_db)):
+    where, args = [], []
+    if status:
+        where.append("review_status = ?"); args.append(status)
+    if from_:
+        where.append("created_day >= ?"); args.append(from_)
+    if to:
+        where.append("created_day <= ?"); args.append(to)
+    if case_no:
+        where.append("case_no = ?"); args.append(case_no)
+    sql = f"SELECT {', '.join(EXPORT_COLUMNS)} FROM expenses" + (f" WHERE {' AND '.join(where)}" if where else "") + " ORDER BY id"
+    rows = db.execute(sql, args).fetchall()
     buf = io.StringIO()
     w = csv.writer(buf)
-    if rows:
-        w.writerow(rows[0].keys())
-        for r in rows:
-            w.writerow([("'" + v if isinstance(v, str) and v[:1] in "=+-@" else v) for v in tuple(r)])
+    w.writerow(EXPORT_COLUMNS)
+    for r in rows:
+        w.writerow([("'" + v if isinstance(v, str) and v[:1] in "=+-@" else v) for v in tuple(r)])
+    st = request.app.state
+    st.access_log.event("export", st.clock(), device_id=device["id"], rows=len(rows), filters=bool(where))
     return Response(buf.getvalue(), media_type="text/csv; charset=utf-8")

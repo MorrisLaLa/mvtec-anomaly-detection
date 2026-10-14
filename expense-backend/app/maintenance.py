@@ -16,6 +16,12 @@ def purge_expired(app, now: datetime | None = None) -> dict:
     try:
         rows = conn.execute("""SELECT id, receipt_path, signature_path, voucher_path FROM expenses
                                WHERE created_day != '' AND created_day < ?""", (cutoff,)).fetchall()
+        ids = [r["id"] for r in rows]
+        if ids:  # 審核事件為「只新增」：保存期限到期時，由此處暫時移除觸發器後刪除，再立即還原
+            conn.execute("DROP TRIGGER IF EXISTS review_events_no_delete")
+            conn.executemany("DELETE FROM review_events WHERE expense_id = ?", [(i,) for i in ids])
+            conn.execute("""CREATE TRIGGER IF NOT EXISTS review_events_no_delete BEFORE DELETE ON review_events
+                            BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END""")
         for r in rows:
             for path in (r["receipt_path"], r["signature_path"], r["voucher_path"]):
                 if path:

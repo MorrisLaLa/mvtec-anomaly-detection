@@ -886,6 +886,10 @@
         <span id="netLabel">線上 · 資料即時同步</span>
         <span class="net-strip-hint">（點一下立即同步）</span>
       </div>
+      <div class="wifi-row" id="reviewBar" style="display:none; justify-content:space-between;">
+        <span id="reviewBarText">主管審核</span>
+        <button class="mini-btn" onclick="openReviewQueue()">開啟審核清單</button>
+      </div>
       <label class="wifi-row"><input type="checkbox" id="wifiOnly" onchange="onWifiToggle()"> 僅 Wi‑Fi 自動上傳（省行動網路流量）</label>
     </div>
 
@@ -909,6 +913,21 @@
     <button class="btn btn-secondary" style="flex:0.85" onclick="startNoReceipt()">
       無單據
     </button>
+  </div>
+
+  <!-- ===== 主管審核清單（reviewer／admin） ===== -->
+  <div id="screen-reviewq" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="screen-title">審核清單</div>
+    </div>
+    <div class="wifi-row" style="gap:8px;">
+      <button class="mini-btn" id="rqHeld" onclick="loadReviewQueue('held')">待處理</button>
+      <button class="mini-btn" id="rqSampled" onclick="loadReviewQueue('sampled')">自動核准・抽查</button>
+    </div>
+    <div class="entry-list" id="reviewList"></div>
   </div>
 
   <!-- ===== Processing Screen ===== -->
@@ -1282,6 +1301,8 @@ function renderHome() {
       ? `<span class="tag tag-review">${escapeHtml(failText(e))}</span>`
       : e.status === 'waiting-wifi'
       ? `<span class="tag tag-pending">${ExpenseSync.networkKind() === 'unsupported' ? '待上傳（請在 Wi‑Fi 下按「立即上傳」）' : '等待 Wi‑Fi'}</span>`
+      : e.status === 'rejected'
+      ? `<span class="tag tag-review">已退回：${escapeHtml((e.reviewReasons || []).join('；') || '請洽管理員')}</span>`
       : e.status === 'pending-sync'
       ? '<span class="tag tag-pending">待同步</span>'
       : (e.status === 'review' ? '<span class="tag tag-review">待審核</span>' : '<span class="tag tag-ok">已記錄</span>');
@@ -1325,7 +1346,7 @@ function closeVoucherViewer(evt) {
 
 // ---------------- Screen switching ----------------
 function showScreen(id) {
-  ['screen-bind','screen-onboarding','screen-pin','screen-home','screen-processing','screen-review'].forEach(s => {
+  ['screen-bind','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
   });
   document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
@@ -1720,6 +1741,88 @@ function onWifiToggle() {
   if (ExpenseSync.autoAllowed()) runSync();
 }
 
+// ---------------- 主管審核（reviewer／admin） ----------------
+let myRole = null;
+const isReviewer = () => myRole === 'reviewer' || myRole === 'admin';
+function api(path, opts = {}) {
+  return fetch(SERVER_URL + path, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + ExpenseSync.getKey() } });
+}
+function showReviewBar() { document.getElementById('reviewBar').style.display = isReviewer() ? 'flex' : 'none'; }
+function loadCachedRole() {
+  // 角色快取在手機上；非 Wi‑Fi 時不為了查角色而連線（遵守「行動網路下不傳輸」）
+  try { myRole = localStorage.getItem('expense_role'); } catch (e) { myRole = null; }
+  showReviewBar();
+}
+async function loadMe() {
+  if (!ExpenseSync.autoAllowed()) { loadCachedRole(); return; }
+  try {
+    const r = await api('/api/v1/me');
+    if (r.status !== 200) return;
+    myRole = (await r.json()).role;
+    try { localStorage.setItem('expense_role', myRole); } catch (e) { /* 略過 */ }
+    showReviewBar();
+    refreshReviewCount();
+  } catch (e) { loadCachedRole(); }
+}
+async function refreshReviewCount() {
+  if (!isReviewer() || !ExpenseSync.autoAllowed()) return;
+  try {
+    const r = await api('/api/v1/review/items?status=held');
+    if (r.ok) document.getElementById('reviewBarText').textContent = `主管審核：${(await r.json()).length} 筆待處理`;
+  } catch (e) { /* 離線 */ }
+}
+function openReviewQueue() { showScreen('screen-reviewq'); loadReviewQueue('held'); }
+async function loadReviewQueue(mode) {
+  document.getElementById('rqSampled').dataset.on = mode === 'sampled' ? '1' : '0';
+  const list = document.getElementById('reviewList');
+  list.innerHTML = '';
+  let items = [];
+  try {
+    const r = await api(mode === 'held' ? '/api/v1/review/items?status=held' : '/api/v1/review/items?status=approved&sampled=1');
+    if (r.ok) items = await r.json();
+  } catch (e) { showToast('連不上伺服器'); }
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-hint">' + (mode === 'held' ? '目前沒有待處理的申報。' : '目前沒有需要抽查的自動核准案件。') + '</div>';
+    return;
+  }
+  items.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    const files = ['receipt', 'signature', 'voucher'].filter(k => it.files && it.files[k])
+      .map(k => `<button class="mini-btn" onclick="viewFile(${Number(it.id)}, '${k}')">${{ receipt: '看收據', signature: '看簽名', voucher: '看憑證' }[k]}</button>`).join('');
+    const reasons = (it.review_reasons || []).join('；');
+    div.innerHTML = `<div class="entry-body">
+      <div class="entry-top"><div class="entry-store">${escapeHtml(it.store || '（未填店家）')}</div><div class="entry-amount">${fmtMoney(Number(it.amount) || 0)}</div></div>
+      <div class="entry-meta"><span class="tag tag-user">${escapeHtml(it.employee || '')}</span><span class="tag tag-cat">${escapeHtml(it.doc_type || '')}</span><span class="tag tag-case">${escapeHtml(it.case_no || '')}</span><span class="tag tag-cat">${escapeHtml(it.category || '')}</span><span class="entry-date">${escapeHtml(it.created_day || '')}</span></div>
+      ${reasons ? `<div class="auto-note warn">${escapeHtml(reasons)}</div>` : ''}
+      <div class="entry-actions">${files}${mode === 'held' ? `<button class="mini-btn" onclick="decideItem(${Number(it.id)}, 'approve')">核准</button>` : ''}<button class="mini-btn danger" onclick="decideItem(${Number(it.id)}, 'reject')">退回</button></div></div>`;
+    list.appendChild(div);
+  });
+}
+async function viewFile(id, kind) {
+  try {
+    const r = await api(`/api/v1/files/${id}/${kind}`);
+    if (!r.ok) { showToast('無法取得圖片'); return; }
+    openVoucherViewer(URL.createObjectURL(await r.blob()));
+  } catch (e) { showToast('連不上伺服器'); }
+}
+async function decideItem(id, decision) {
+  let comment = '';
+  if (decision === 'reject') {
+    comment = (window.prompt('退回理由（必填）') || '').trim();
+    if (!comment) { showToast('退回必須填寫理由'); return; }
+  }
+  try {
+    const r = await api(`/api/v1/review/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, comment }) });
+    if (r.ok) showToast(decision === 'approve' ? '已核准' : '已退回');
+    else if (r.status === 403) showToast('不可審核自己的申報');
+    else if (r.status === 409) showToast('這筆已決定，無法再變更');
+    else showToast('操作失敗（' + r.status + '）');
+  } catch (e) { showToast('連不上伺服器'); }
+  loadReviewQueue(document.getElementById('rqSampled').dataset.on === '1' ? 'sampled' : 'held');
+  refreshReviewCount();
+}
+
 // ---------------- 裝置綁定 ----------------
 function showBind(msg) {
   document.getElementById('bindError').textContent = msg || '';
@@ -1735,6 +1838,7 @@ async function submitBind() {
     if (r.status === 200) {
       ExpenseSync.setKey(key);
       showToast('已綁定這支手機');
+      loadMe();
       if (currentUser) { goHome(); return; }
       const saved = loadUser();
       if (saved) chooseIdentity(saved); else { renderUserGrid(); showScreen('screen-onboarding'); }
@@ -1754,7 +1858,9 @@ function onSyncFlush(r) {
     const e = entries.find(x => x.clientId === id);
     if (e) {
       const srv = r.results[id] || {};
-      e.status = srv.needs_review ? 'review' : 'ok';
+      // 以伺服器的審核結果為準：approved 已記錄、held 待審核、rejected 已退回（附原因）
+      e.status = srv.review_status === 'rejected' ? 'rejected' : (srv.review_status === 'held' || (!srv.review_status && srv.needs_review) ? 'review' : 'ok');
+      e.reviewReasons = srv.review_status === 'rejected' ? (srv.review_reasons || []) : [];
     }
   });
   r.failed.forEach(f => {
@@ -1770,7 +1876,8 @@ function onSyncFlush(r) {
     showToast(failText({ failStatus: r.failed[0].status, retryAfter: r.failed[0].retryAfter, failMessage: r.failed[0].message }));
   } else if (r.sent === 1) {
     const e = entries.find(x => x.clientId === Object.keys(r.results)[0]);
-    showToast(e && e._wasReview ? '已送出，待主管審核' : (e && e._signed ? '申報已送出（含簽收憑證）' : '申報已送出'));
+    if (e && e.status === 'rejected') showToast('已退回：' + (e.reviewReasons || []).join('；'));
+    else showToast(e && e._wasReview ? '已送出，待主管審核' : (e && e._signed ? '申報已送出（含簽收憑證）' : '申報已送出'));
   } else if (r.sent > 1) {
     showToast(`已同步 ${r.sent} 筆資料`);
   }
@@ -1895,6 +2002,7 @@ updateNetUI();
 loadPendingQueue();
 
 document.getElementById('wifiOnly').checked = ExpenseSync.getPolicy() === 'wifi_only';
+if (ExpenseSync.getKey()) loadMe();
 const savedUser = loadUser();
 if (!ExpenseSync.getKey()) {
   showBind(); // 尚未綁定裝置金鑰

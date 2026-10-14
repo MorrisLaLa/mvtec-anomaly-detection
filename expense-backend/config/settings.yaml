@@ -29,3 +29,11 @@ logging:
   retention_days: 90          # 存取記錄保留天數（不含請求本體與金鑰）
 retention:
   retention_days: 1825        # 資料與圖片保存 5 年，到期由 `python -m app.maintenance purge` 刪除
+# 自動審核規則（M3）。規則只能經由此設定檔與部署流程變更，不提供任何 API 修改。
+review:
+  rule_version: v1            # 變更任何門檻時請同步改版本號；每筆決定都會記錄版本
+  max_amount: 5000            # QR 發票單筆自動核准上限
+  max_age_days: 90            # 發票距今超過幾天改轉人工
+  monthly_cap: 30000          # 每裝置每月（台北時間）自動核准總額上限
+  no_receipt_limit: 1000      # 無單據 ≤ 此金額自動核准，超過轉人工
+  sample_percent: 10          # 自動核准案件中標記「抽查」的比例
