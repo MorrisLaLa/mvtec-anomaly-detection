@@ -818,6 +818,15 @@
     </div>
   </div>
 
+  <!-- ===== 配對中／配對失敗（點連結或掃 QR 後） ===== -->
+  <div id="screen-pair" class="screen" style="display:none;">
+    <div class="onboard">
+      <div class="onboard-badge">$</div>
+      <div class="onboard-title" id="pairTitle">正在設定這支手機…</div>
+      <div class="onboard-sub" id="pairMsg">請稍等，不需要輸入任何東西。</div>
+    </div>
+  </div>
+
   <!-- ===== Onboarding / Identity Screen ===== -->
   <div id="screen-onboarding" class="screen" style="display:none;">
     <div class="onboard">
@@ -1348,7 +1357,7 @@ function closeVoucherViewer(evt) {
 
 // ---------------- Screen switching ----------------
 function showScreen(id) {
-  ['screen-bind','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
+  ['screen-bind','screen-pair','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
   });
   document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
@@ -2028,6 +2037,34 @@ function showToast(text) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+// ---------------- 配對連結（點連結或掃 QR） ----------------
+function pairFail(title, msg) {
+  document.getElementById('pairTitle').textContent = title;
+  document.getElementById('pairMsg').textContent = msg;
+  showScreen('screen-pair');
+}
+async function pairWithToken(token) {
+  showScreen('screen-pair');
+  try {
+    const r = await fetch(SERVER_URL + '/api/v1/pair', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+    if (r.status === 200) {
+      const j = await r.json();
+      ExpenseSync.setKey(j.key);
+      try { localStorage.removeItem('expense_role'); } catch (e) { /* 略過 */ }
+      finishLogin(j.name); // 姓名由伺服器的裝置名稱決定；PIN 為選用，預設不設
+      showToast('設定完成，' + j.name + '你好');
+      loadMe();
+    } else if (r.status === 429) {
+      pairFail('請稍後再試', '嘗試次數太多了，請過幾分鐘再點一次連結。');
+    } else {
+      pairFail('這個連結已失效', '這個連結已失效，請向管理員索取新的。');
+    }
+  } catch (e) {
+    pairFail('連不上伺服器', '請確認手機有網路，然後再點一次連結。');
+  }
+}
+
 // ---------------- Init ----------------
 renderHome();
 updateNetUI();
@@ -2036,10 +2073,16 @@ loadPendingQueue();
 document.getElementById('wifiOnly').checked = ExpenseSync.getPolicy() === 'wifi_only';
 if (ExpenseSync.getKey()) loadMe();
 const savedUser = loadUser();
-if (!ExpenseSync.getKey()) {
+const pairMatch = /^#pair=([A-Za-z0-9_-]{1,200})$/.exec(location.hash);
+if (pairMatch) {
+  history.replaceState(null, '', location.pathname + location.search); // 立刻清掉網址中的配對碼
+  pairWithToken(pairMatch[1]);
+} else if (!ExpenseSync.getKey()) {
   showBind(); // 尚未綁定裝置金鑰
+} else if (savedUser && loadPins()[savedUser]) {
+  chooseIdentity(savedUser); // 此身份已自行開啟 PIN → 顯示解鎖畫面
 } else if (savedUser) {
-  chooseIdentity(savedUser); // existing PIN on this device → shows unlock screen automatically
+  finishLogin(savedUser); // PIN 為選用、預設關閉：直接進首頁
 } else {
   renderUserGrid();
   showScreen('screen-onboarding');
