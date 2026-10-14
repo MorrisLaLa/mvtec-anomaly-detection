@@ -167,7 +167,7 @@ def test_admin_list_hides_keys(env):
 
 def test_admin_cli_main(tmp_path, capsys):
     db = str(tmp_path / "cli.db")
-    assert admin.main(["--db", db, "create-device", "--name", "手機A", "--role", "submitter", "--days", "30"]) == 0
+    assert admin.main(["--db", db, "create-device", "--name", "手機A", "--role", "submitter", "--days", "30", "--show-key"]) == 0
     out = capsys.readouterr().out
     assert "ek_" in out
     assert admin.main(["--db", db, "list"]) == 0

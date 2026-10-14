@@ -23,6 +23,17 @@ def hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+PAIR_PREFIX = "pt_"
+
+
+def generate_pair_token() -> str:
+    return PAIR_PREFIX + secrets.token_urlsafe(16)  # 128 位元
+
+
+def hash_pair_token(token: str) -> str:
+    return hashlib.sha256(b"pair:" + token.encode()).hexdigest()  # 與金鑰雜湊分開
+
+
 def to_iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime(ISO)
 

@@ -11,7 +11,7 @@ from .auth import SlidingWindow
 from .config import Settings, load_settings
 from .limits import BodyLimitMiddleware
 from .ocr_provider import NullOCRProvider, OCRProvider
-from .routers import expenses, review
+from .routers import expenses, pair, review
 from .storage import LocalStorage, StorageBackend
 
 
@@ -39,6 +39,7 @@ def create_app(
     app.state.db_factory = lambda: database.connect(settings.db_path)
     app.state.access_log = AccessLog(settings.access_log_dir, settings.access_log_retention_days)
     app.include_router(expenses.router, prefix="/api/v1")
+    app.include_router(pair.router, prefix="/api/v1")
     app.include_router(review.router, prefix="/api/v1")
     frontend = Path(__file__).resolve().parent.parent / "frontend"
     if frontend.is_dir():  # 同源提供 PWA，免 CORS

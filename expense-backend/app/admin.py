@@ -7,7 +7,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from . import database
-from .auth import ROLES, generate_key, hash_key, to_iso, from_iso
+from .auth import ROLES, generate_key, generate_pair_token, hash_key, hash_pair_token, to_iso, from_iso
 
 DEFAULT_DAYS = 365
 
@@ -48,6 +48,29 @@ def create_device(conn, name, role, *, now=None, days=None, expires=None, never=
     return {"id": cur.lastrowid, "name": name, "role": role, "expires_at": exp, "key": key}
 
 
+def create_pairing_code(conn, name, *, now=None, ttl_hours=24):
+    """為未撤銷的裝置產生一次性配對碼（只存雜湊）。"""
+    now = _now(now)
+    dev = conn.execute("SELECT id FROM devices WHERE name = ? AND revoked_at IS NULL", (name,)).fetchone()
+    if not dev:
+        raise ValueError(f"找不到可配對的裝置：{name}")
+    token = generate_pair_token()
+    exp = to_iso(now + timedelta(hours=ttl_hours))
+    conn.execute("INSERT INTO pairing_codes(device_id, token_hash, created_at, expires_at) VALUES(?,?,?,?)",
+                 (dev["id"], hash_pair_token(token), to_iso(now), exp))
+    conn.commit()
+    return {"device_id": dev["id"], "token": token, "expires_at": exp}
+
+
+def pairing_link(base_url, token):
+    return f"{base_url.rstrip('/')}/pwa/expense-demo.html#pair={token}"
+
+
+def write_qr_png(link, path):
+    import qrcode
+    qrcode.make(link).save(path, format="PNG")
+
+
 def list_devices(conn, *, now=None):
     now = _now(now)
     out = []
@@ -80,6 +103,16 @@ def set_expiry(conn, name, *, now=None, days=None, expires=None, never=False):
         raise ValueError(f"找不到裝置：{name}")
 
 
+def _print_pairing(conn, name, a, settings):
+    p = create_pairing_code(conn, name, ttl_hours=settings.pairing_ttl_hours)
+    link = pairing_link(a.base_url, p["token"])
+    print(f"配對連結（{settings.pairing_ttl_hours} 小時內有效、只能用一次，請單獨傳給本人）：")
+    print(link)
+    if a.qr:
+        write_qr_png(link, a.qr)
+        print(f"QR 圖檔：{a.qr}")
+
+
 def main(argv=None) -> int:
     from .config import load_settings
 
@@ -89,6 +122,12 @@ def main(argv=None) -> int:
     c = sub.add_parser("create-device")
     c.add_argument("--name", required=True)
     c.add_argument("--role", required=True, choices=ROLES)
+    c.add_argument("--show-key", action="store_true", help="直接顯示長金鑰（手動輸入備案），不產生配對連結")
+    pl = sub.add_parser("pair-link", help="為既有裝置重新產生配對連結（配對成功後舊金鑰失效）")
+    pl.add_argument("--name", required=True)
+    for sp in (c, pl):
+        sp.add_argument("--base-url", default="https://<主機>", help="例如 https://expense.example.com")
+        sp.add_argument("--qr", help="QR 圖檔輸出路徑（PNG）")
     for sp in (c, sub.add_parser("set-expiry")):
         if sp is not c:
             sp.add_argument("--name", required=True)
@@ -109,7 +148,12 @@ def main(argv=None) -> int:
             d = create_device(conn, a.name, a.role, days=a.days, expires=a.expires, never=a.never,
                               default_days=settings.device_key_default_days)
             print(f"已建立裝置「{d['name']}」（{d['role']}），到期：{d['expires_at'] or '永不過期'}")
-            print(f"金鑰（只顯示這一次，請立即交給使用者）：{d['key']}")
+            if a.show_key:
+                print(f"金鑰（只顯示這一次，請立即交給使用者）：{d['key']}")
+            else:
+                _print_pairing(conn, d["name"], a, settings)
+        elif a.cmd == "pair-link":
+            _print_pairing(conn, a.name, a, settings)
         elif a.cmd == "list":
             for d in list_devices(conn):
                 left = "永不過期" if d["days_left"] is None else f"剩 {d['days_left']} 天"

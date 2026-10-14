@@ -17,6 +17,7 @@ class Settings:
     device_key_default_days: int = 365
     auth_fail_limit: int = 10
     auth_fail_window_s: int = 900
+    pairing_ttl_hours: int = 24
     device_rate_per_min: int = 60
     daily_submit_limit: int = 100
     daily_upload_limit_bytes: int = 200 * 1024 * 1024
@@ -46,6 +47,7 @@ def load_settings() -> Settings:
         device_key_default_days=int((raw.get("auth") or {}).get("device_key_default_days", 365)),
         auth_fail_limit=int((raw.get("auth") or {}).get("fail_limit", 10)),
         auth_fail_window_s=int((raw.get("auth") or {}).get("fail_window_seconds", 900)),
+        pairing_ttl_hours=int((raw.get("auth") or {}).get("pairing_ttl_hours", 24)),
         device_rate_per_min=int((raw.get("auth") or {}).get("device_rate_per_min", 60)),
         daily_submit_limit=int((raw.get("limits") or {}).get("daily_submit_limit", 100)),
         daily_upload_limit_bytes=int((raw.get("limits") or {}).get("daily_upload_limit_mb", 200)) * 1024 * 1024,

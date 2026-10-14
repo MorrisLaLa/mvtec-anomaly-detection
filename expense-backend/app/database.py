@@ -12,6 +12,14 @@ CREATE TABLE IF NOT EXISTS devices (
     revoked_at TEXT,
     last_seen_at TEXT
 );
+CREATE TABLE IF NOT EXISTS pairing_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id INTEGER NOT NULL REFERENCES devices(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+);
 CREATE TABLE IF NOT EXISTS expenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id INTEGER NOT NULL REFERENCES devices(id),
