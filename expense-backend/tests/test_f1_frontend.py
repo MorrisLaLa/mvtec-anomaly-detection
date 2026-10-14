@@ -215,3 +215,56 @@ def test_signature_png_keeps_transparency_while_receipt_jpeg_gets_white_backgrou
     assert r["sigType"] == "image/png" and r["sigPx"][3] == 0       # 簽名：仍是透明
     if r["jpgType"] == "image/jpeg":
         assert r["jpgPx"][0] > 240 and r["jpgPx"][3] == 255          # 收據 JPEG：白底，不是黑底
+
+
+# ---------- 圖片傳輸確實等到 Wi-Fi（含簽名圖與憑證圖）----------
+WIFI_THEN_SWITCHABLE = """(() => { const c = new EventTarget(); c.type = 'wifi';
+  Object.defineProperty(navigator, 'connection', {value: c, configurable: true});
+  window.__setNet = (t) => { c.type = t; c.dispatchEvent(new Event('change')); }; })();"""
+
+
+def test_images_are_not_transmitted_on_cellular_and_sizes_are_small_on_wifi(server, page):
+    posts = []
+    page.on("request", lambda r: posts.append(len(r.post_data_buffer or b"")) if r.method == "POST" else None)
+    api_calls = []
+    page.on("request", lambda r: api_calls.append(r.url) if "/api/" in r.url else None)
+    login(page, server, policy=None, init_script=CELLULAR)
+    submit_no_receipt(page, sign=True)  # 含簽名圖與合成的憑證圖
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待 Wi")
+    time.sleep(1.5)
+    assert posts == [] and api_calls == []  # 行動網路下，沒有任何 POST，也沒有任何對 API 的連線
+    assert page.evaluate("ExpenseSync.pending()") == 1
+    page.evaluate("window.__setNet('wifi')")
+    wait_pending_zero(page)
+    assert len(posts) == 1
+    sig, vou = server.query("SELECT signature_path, voucher_path FROM expenses")[0]
+    assert sig and vou
+    print(f"\n[實測] 簽名＋憑證圖上傳的請求本體：{posts[0] / 1024:.0f} KB")
+    assert posts[0] < 300 * 1024  # 兩張圖加欄位，應遠小於 300KB
+
+
+def test_network_drop_mid_queue_stops_remaining_uploads(server, page):
+    """連著 Wi-Fi 開始上傳多筆，第一筆傳到一半手機切到行動網路：其餘筆不得再用行動網路送出。"""
+    n = {"c": 0}
+
+    def slow_first(route):
+        n["c"] += 1
+        if n["c"] == 1:
+            time.sleep(0.8)  # 第一筆在途中，這段時間內網路會被切到行動網路
+        route.continue_()
+
+    page.route("**/api/v1/submit", slow_first)
+    login(page, server, policy=None, init_script=WIFI_THEN_SWITCHABLE)
+    page.evaluate("""async () => {
+        const mk = (id) => ({fields: {client_id: id, amount: '5', store: 's', category: 'x'}});
+        for (const id of ['N1', 'N2', 'N3']) await ExpenseSync.enqueueOnly(mk(id));
+        setTimeout(() => window.__setNet('cellular'), 300);   // 第一筆請求尚未回應時切換
+        ExpenseSync.flush();
+    }""")
+    page.wait_for_timeout(2500)  # 不能用 time.sleep：那段時間 Playwright 不會處理路由事件
+    sent = [r[0] for r in server.query("SELECT client_id FROM expenses")]
+    assert sent == ["N1"]  # 已在途中的第一筆無法收回，後面兩筆必須留在佇列
+    assert page.evaluate("ExpenseSync.pending()") == 2
+    page.evaluate("window.__setNet('wifi')")  # 回到 Wi-Fi 後自動補送
+    wait_pending_zero(page)
+    assert sorted(r[0] for r in server.query("SELECT client_id FROM expenses")) == ["N1", "N2", "N3"]

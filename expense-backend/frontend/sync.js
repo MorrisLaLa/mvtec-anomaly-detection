@@ -144,7 +144,10 @@
         if (cfg.onFlush) { try { cfg.onFlush(summary); } catch (e) { /* UI 錯誤不影響同步 */ } }
         return summary;
       }
+      let heldMid = false;
       for (const item of items) {
+        // 每一筆送出前重新檢查：上傳途中手機若切到行動網路，剩下的保留等待（已在途中的那筆無法收回）
+        if (!opts.force && !opts.only && !autoAllowed()) { heldMid = true; break; }
         const r = await send(item);
         const k = item.fields.client_id;
         if (r.ok) { await del(k); results[k] = r.body; }
@@ -156,7 +159,7 @@
       }
       const remaining = (await all()).length;
       if (retry) scheduleRetry(); else { attempt = 0; clearTimeout(timer); }
-      const summary = { sent: Object.keys(results).length, remaining, results, failed: failedNow, stalled: retry, held: 0, networkKind: networkKind() };
+      const summary = { sent: Object.keys(results).length, remaining, results, failed: failedNow, stalled: retry, held: heldMid ? remaining : 0, networkKind: networkKind() };
       if (cfg.onFlush) { try { cfg.onFlush(summary); } catch (e) { /* UI 錯誤不影響同步 */ } }
       return summary;
     }
