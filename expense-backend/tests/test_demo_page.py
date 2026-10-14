@@ -48,6 +48,7 @@ def submit_no_receipt(page, amount, store):
     page.click("#homeActionBar button:has-text('沒有收據')")
     page.fill("#fieldAmount", str(amount))
     page.fill("#fieldStore", store)
+    page.click("#screen-review button:has-text('更多選項')")
     page.click("#categoryChips .chip:text-is('餐飲雜支')")
     page.click(".btn-submit")
 

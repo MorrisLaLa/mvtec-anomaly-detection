@@ -26,6 +26,8 @@ def finish(page, store="金勝五金行", category="五金材料", amount=None):
     if amount is not None:
         page.fill("#fieldAmount", str(amount))
     page.fill("#fieldStore", store)
+    if page.is_hidden("#moreOptions"):
+        page.click("#screen-review button:has-text('更多選項')")
     page.click(f"#categoryChips .chip:text-is('{category}')")
     page.click(".btn-submit")
 
@@ -71,6 +73,7 @@ def test_same_invoice_twice_is_rejected_as_duplicate_with_reason(server, page):
 def test_photo_without_qr_goes_to_human_review(server, page):
     login(page, server)
     pick(page, png(), name="blank.png")  # 沒有 QR 的照片
+    page.click("#screen-review button:has-text('更多選項')")
     page.click("#docTypeChips .chip:text-is('收據')")
     finish(page, amount=180)
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")

@@ -407,6 +407,7 @@
   }
   .action-bar .btn-primary { flex: 1 1 100%; min-height: 64px; font-size: 20px; }
   .action-bar .btn-secondary { flex: 1 1 0; min-height: 48px; font-size: 16px; }
+  .more-toggle { width: 100%; min-height: 48px; margin: 4px 0 10px; }
   .btn {
     border: none;
     border-radius: 14px;
@@ -992,6 +993,18 @@
         </div>
       </div>
 
+      <div class="field-group">
+        <div class="field-label">工程案件</div>
+        <div class="case-select" onclick="openCaseSheet(true)">
+          <span class="case-select-text" id="reviewCaseLabel">UY2301<small>點一下可更換</small></span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="threshold-banner" id="thresholdBanner"></div>
+
+      <button type="button" class="btn btn-secondary more-toggle" id="moreToggle" onclick="toggleMore()">更多選項</button>
+      <div id="moreOptions" style="display:none;">
       <div class="field-group" style="display:flex; gap:12px;">
         <div style="flex:1;">
           <div class="field-label">支出日期</div>
@@ -1019,16 +1032,6 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">工程案件</div>
-        <div class="case-select" onclick="openCaseSheet(true)">
-          <span class="case-select-text" id="reviewCaseLabel">UY2301<small>點一下可更換</small></span>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>
-      </div>
-
-      <div class="threshold-banner" id="thresholdBanner"></div>
-
-      <div class="field-group">
         <div class="field-label"><span>廠商簽名 <span class="field-hint">選填，如油罐車、供應商送貨單</span></span></div>
         <div class="signature-box" id="signatureBox" onclick="openSignaturePad()">
           <div class="signature-box-icon" id="signatureBoxIcon">
@@ -1039,6 +1042,8 @@
             <div class="signature-box-sub" id="signatureBoxSub">確認交付數量或到貨內容</div>
           </div>
         </div>
+      </div>
+
       </div>
 
     </div>
@@ -1388,6 +1393,7 @@ function startNoReceipt() {
 }
 
 function openReview() {
+  toggleMore(false); // 每次進確認畫面，「更多選項」預設收起
   correctionMade = false;
   document.getElementById('correctionNote').classList.remove('show');
   reviewCaseIndex = boundCaseIndex;
@@ -1500,6 +1506,12 @@ function selectCategory(cat, autoCat) {
 }
 
 function onAmountChange() { checkThreshold(); }
+function toggleMore(open) {
+  const box = document.getElementById('moreOptions');
+  const show = open === undefined ? box.style.display === 'none' : open;
+  box.style.display = show ? 'block' : 'none';
+  document.getElementById('moreToggle').textContent = show ? '收起更多選項' : '更多選項';
+}
 function checkThreshold() {
   const banner = document.getElementById('thresholdBanner');
   const amt = parseInt(document.getElementById('fieldAmount').value || '0', 10);

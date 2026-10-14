@@ -126,6 +126,8 @@ def submit_no_receipt(page, amount="120", store="測試店", category="五金材
     page.click("#homeActionBar button:has-text('沒有收據')")
     page.fill("#fieldAmount", amount)
     page.fill("#fieldStore", store)
+    if category or sign:
+        page.click("#screen-review button:has-text('更多選項')")
     if category:
         page.click(f"#categoryChips .chip:text-is('{category}')")
     if sign:
