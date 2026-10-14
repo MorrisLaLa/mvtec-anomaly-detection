@@ -293,6 +293,8 @@ def _response(row, duplicate=False, recognition=None, reasons=None):
         "duplicate": duplicate,
         "id": row["id"],
         "client_id": row["client_id"],
+        "amount": row["amount"],
+        "invoice_no": row["invoice_no"],
         "case_no": row["case_no"],
         "store": row["store"],
         "seller_tax_id": row["seller_tax_id"],

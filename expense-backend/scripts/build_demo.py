@@ -50,6 +50,31 @@ body = body.replace('<div class="pin-error" id="bindError"', '<div class="onboar
 # 6) 內嵌 sync.js 與模擬伺服器（模擬伺服器必須先於 sync.js）
 body = body.replace('<script src="sync.js"></script>', "<script>\n" + mock + "\n</script>\n<script>\n" + sync + "\n</script>", 1)
 
+# 7) 示範版專用：正式版的「拍照／相簿」會開啟真的選檔；示範版（沒有真的相機與後端辨識）改用模擬的單據
+demo_capture = """
+<script>
+// 示範專用：模擬拍照辨識（統一發票視為 QR 驗證成功）。正式版 expense-demo.html 會開啟真的相機／相簿。
+const DEMO_RECEIPTS = [
+  { type: 'invoice', store: '金勝五金行', amount: 850, hasTax: true },
+  { type: 'invoice', store: '中油 台南永康站', amount: 1240, hasTax: true },
+  { type: 'receipt', store: '和發工具租賃行', amount: 2600, hasTax: false },
+  { type: 'receipt', store: '阿明小吃部', amount: 180, hasTax: false },
+];
+let receiptCursor = 0;
+window.startCapture = function (source) {
+  document.getElementById('processingText').textContent = source === 'photo' ? '正在辨識拍攝的單據…' : '正在辨識上傳的單據…';
+  showScreen('screen-processing');
+  setTimeout(() => {
+    const r = DEMO_RECEIPTS[receiptCursor % DEMO_RECEIPTS.length];
+    receiptCursor++;
+    currentReceipt = { ...r, isNoReceipt: false };
+    openReview();
+  }, 1100);
+};
+</script>
+"""
+body = body + demo_capture
+
 out = f"""<title>支出申報示範</title>
 <link href="{fonts}" rel="stylesheet">
 <style>{style}{bar_css}

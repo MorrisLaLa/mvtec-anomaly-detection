@@ -901,6 +901,8 @@
     <div class="entry-list" id="entryList"></div>
   </div>
 
+  <input type="file" id="capCamera" accept="image/*" capture="environment" hidden onchange="onReceiptPicked(this)">
+  <input type="file" id="capAlbum" accept="image/*" hidden onchange="onReceiptPicked(this)">
   <div class="action-bar" id="homeActionBar">
     <button class="btn btn-primary" onclick="startCapture('photo')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.6A2 2 0 0 1 9.85 3.4h4.3a2 2 0 0 1 1.75 1l.9 1.6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="12.5" r="3.6"/></svg>
@@ -987,6 +989,12 @@
           <div class="field-label">申報日期</div>
           <div class="field-box" style="opacity:0.6;"><input type="date" id="fieldReportDate" disabled></div>
         </div>
+      </div>
+
+      <div class="field-group" id="docTypeGroup" style="display:none;">
+        <div class="field-label">單據類型</div>
+        <div class="chip-row" id="docTypeChips"></div>
+        <div class="auto-note" id="docTypeNote"></div>
       </div>
 
       <div class="field-group">
@@ -1104,13 +1112,7 @@ function classify(storeName) {
   return { category: '待分類', confidence: 'low' };
 }
 
-const DEMO_RECEIPTS = [
-  { type: 'invoice', store: '金勝五金行', amount: 850, hasTax: true },
-  { type: 'invoice', store: '中油 台南永康站', amount: 1240, hasTax: true },
-  { type: 'receipt', store: '和發工具租賃行', amount: 2600, hasTax: false },
-  { type: 'receipt', store: '阿明小吃部', amount: 180, hasTax: false },
-];
-let receiptCursor = 0;
+let selectedDocType = '統一發票';   // 有照片時由使用者選擇；送出後由後端自動辨識 QR
 
 let entries = [
   { store: '永昌五金行', amount: 620, category: '五金材料', case: CASES[0], date: daysAgo(1), type: '統一發票', status: 'ok' },
@@ -1355,14 +1357,17 @@ function goHome() { renderHome(); showScreen('screen-home'); }
 
 // ---------------- Capture flow ----------------
 function startCapture(source) {
-  document.getElementById('processingText').textContent = source === 'photo' ? '正在辨識拍攝的單據…' : '正在辨識上傳的單據…';
-  showScreen('screen-processing');
-  setTimeout(() => {
-    const r = DEMO_RECEIPTS[receiptCursor % DEMO_RECEIPTS.length];
-    receiptCursor++;
-    currentReceipt = { ...r, isNoReceipt: false };
-    openReview();
-  }, 1100);
+  // 開啟手機相機（photo）或相簿（album）；選好照片後由 onReceiptPicked 接手
+  document.getElementById(source === 'photo' ? 'capCamera' : 'capAlbum').click();
+}
+
+function onReceiptPicked(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // 讓同一張照片可以再次選取
+  if (!file) return;
+  if (currentReceipt && currentReceipt.previewUrl) URL.revokeObjectURL(currentReceipt.previewUrl);
+  currentReceipt = { type: 'photo', store: '', amount: 0, hasTax: true, isNoReceipt: false, file, previewUrl: URL.createObjectURL(file) };
+  openReview();
 }
 
 function startNoReceipt() {
@@ -1390,6 +1395,10 @@ function openReview() {
     typeLabel.textContent = '無單據申報';
     typeSub.textContent = '請填寫店家、金額與用途';
     thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></svg>`;
+  } else if (r.file) {
+    typeLabel.textContent = '已附單據照片';
+    typeSub.textContent = '送出後系統會自動辨識電子發票 QR；金額留空時以發票上的金額為準';
+    thumb.innerHTML = `<img src="${r.previewUrl}" alt="單據照片" style="width:100%;height:100%;object-fit:cover;border-radius:7px;">`;
   } else if (r.hasTax) {
     typeLabel.textContent = '統一發票';
     typeSub.textContent = '已辨識統一編號，屬有效憑證';
@@ -1399,6 +1408,11 @@ function openReview() {
     typeSub.textContent = '未辨識統一編號，屬非發票憑證';
     thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/><path d="M9 12h6M9 15h4" stroke-dasharray="1.5 2"/></svg>`;
   }
+
+  // 單據類型（僅照片模式）
+  selectedDocType = '統一發票';
+  document.getElementById('docTypeGroup').style.display = r.file ? 'block' : 'none';
+  if (r.file) renderDocTypeChips();
 
   // category chips
   let cls;
@@ -1413,6 +1427,20 @@ function openReview() {
 
   checkThreshold();
   showScreen('screen-review');
+}
+
+function renderDocTypeChips() {
+  const row = document.getElementById('docTypeChips');
+  row.innerHTML = '';
+  ['統一發票', '收據'].forEach(t => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (t === selectedDocType ? ' active' : '');
+    chip.textContent = t;
+    chip.onclick = () => { selectedDocType = t; renderDocTypeChips(); };
+    row.appendChild(chip);
+  });
+  document.getElementById('docTypeNote').textContent = selectedDocType === '統一發票'
+    ? '有電子發票 QR 時，系統會自動核對並可能自動核准。' : '收據沒有可驗證的 QR，會交由主管審核。';
 }
 
 let selectedCategory = '';
@@ -1522,7 +1550,8 @@ async function submitEntry() {
   const reportDate = document.getElementById('fieldReportDate').value;
   const isReview = currentReceipt.isNoReceipt && amount > 1000;
   const caseObj = CASES[reviewCaseIndex];
-  const typeLabel = currentReceipt.isNoReceipt ? '無單據' : (currentReceipt.hasTax ? '統一發票' : '收據');
+  const typeLabel = currentReceipt.isNoReceipt ? '無單據' : (currentReceipt.file ? selectedDocType : (currentReceipt.hasTax ? '統一發票' : '收據'));
+  const amountBlank = !document.getElementById('fieldAmount').value.trim();
 
   let voucherImage = null;
   if (signatureDataURL) {
@@ -1556,12 +1585,14 @@ async function submitEntry() {
         owner_case_no: caseObj.owner,
         doc_type: typeLabel,
         employee: currentUser || '',
-        amount: String(amount),
+        // 有照片且金額留空：交給伺服器以發票 QR 為準；其餘照舊
+        amount: (currentReceipt.file && amountBlank) ? '' : String(amount),
         store: rawStore,
         expense_date: date,
         category: selectedCategory,
         suggested_category: autoCategory,
       },
+      receipt: currentReceipt.file || null,
       signature: signatureDataURL ? await dataUrlToBlob(signatureDataURL) : null,
       voucher: voucherImage ? await dataUrlToBlob(voucherImage) : null,
       meta: {
@@ -1608,7 +1639,7 @@ function buildVoucherImage(data) {
     ctx.beginPath(); ctx.moveTo(36, 98); ctx.lineTo(W - 36, 98); ctx.stroke();
 
     const rows = [
-      ['金額', 'NT$ ' + Number(data.amount).toLocaleString('en-US')],
+      ['金額', data.amount ? 'NT$ ' + Number(data.amount).toLocaleString('en-US') : '以發票上的金額為準'],
       ['店家', data.store],
       ['分類', data.category],
       ['支出日期', data.date],
@@ -1858,6 +1889,7 @@ function onSyncFlush(r) {
     const e = entries.find(x => x.clientId === id);
     if (e) {
       const srv = r.results[id] || {};
+      if (typeof srv.amount === 'number') e.amount = srv.amount;
       // 以伺服器的審核結果為準：approved 已記錄、held 待審核、rejected 已退回（附原因）
       e.status = srv.review_status === 'rejected' ? 'rejected' : (srv.review_status === 'held' || (!srv.review_status && srv.needs_review) ? 'review' : 'ok');
       e.reviewReasons = srv.review_status === 'rejected' ? (srv.review_reasons || []) : [];
