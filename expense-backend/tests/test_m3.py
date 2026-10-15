@@ -118,7 +118,6 @@ def test_no_receipt_threshold(env, amount, expected):
     ("over_limit", {"amount": "5001"}, dict(total=5001)),
     ("too_old", {"amount": "210"}, dict(date=roc(T0 - timedelta(days=91)))),
     ("buyer_mismatch", {"amount": "210"}, dict(buyer="04541302")),
-    ("category_pending", {"amount": "210", "category": "待分類"}, dict()),
 ])
 def test_soft_conditions_go_to_human(env, name, data, qr_kwargs):
     c, keys, conn, s = env
@@ -285,3 +284,13 @@ def test_me_endpoint(env):
     me = c.get("/api/v1/me", headers=H(keys["乙"])).json()
     assert me["name"] == "乙" and me["role"] == "reviewer"
     assert c.get("/api/v1/me").status_code == 401
+
+
+@pytest.mark.parametrize("category", ["待分類", ""])
+def test_unclassified_category_alone_does_not_need_manager(env, category):
+    """使用者決定（2026-10-15）：只因為用途未確定（店家留白）不再轉主管確認；用途保持原樣，由會計事後整理。"""
+    c, keys, conn, s = env
+    as_(c, keys, "甲")
+    r = submit(c, keys["甲"], "U1", {"amount": "210", "category": category, "store": ""}, qr=qr_text(date=TODAY, no=inv()))
+    assert r.status_code == 200 and r.json()["review_status"] == "approved", r.json()
+    assert status(conn, "U1")["review_status"] == "approved"

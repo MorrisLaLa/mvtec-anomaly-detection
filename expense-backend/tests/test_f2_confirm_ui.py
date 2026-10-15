@@ -33,11 +33,10 @@ def test_photo_confirm_screen_hides_doc_type_and_submits_in_one_tap(server, page
     page.click(".btn-submit")                      # 只點一次：金額由發票 QR 帶入、店家可不填
     page.click("#screen-result button:has-text('完成')")
     page.wait_for_selector("#screen-home", state="visible")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     r = row(server)
     assert len(r) == 1 and r[0][1] == 210
-    # 已知限制（M3 既定規則）：店家留白 → 用途無法自動判斷（待分類）→ 轉主管確認，不會自動核准。
-    assert r[0][6] == "held"
+    assert r[0][6] == "approved"   # 店家留白也不需主管確認（使用者決定 2026-10-15）
 
 
 def test_more_options_collapses_again_on_next_entry(server, page):

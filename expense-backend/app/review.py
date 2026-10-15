@@ -66,8 +66,7 @@ def decide(db, cfg, now: datetime, device: dict, client_id: str, x: dict) -> dic
                 hold.append(f"發票已超過 {cfg.review_max_age_days} 天")
     if no_receipt and x.get("expense_date") and x["expense_date"] > today:
         hold.append("支出日期在未來")
-    if not x.get("category") or x["category"] == "待分類":
-        hold.append("分類尚未確定")
+    # 用途未確定（待分類）不再轉人工：使用者決定（2026-10-15），由會計事後整理
     month = today[:7]
     used = db.execute("""SELECT COALESCE(SUM(amount), 0) FROM expenses
                          WHERE device_id=? AND review_status='approved' AND substr(created_day,1,7)=?""",
