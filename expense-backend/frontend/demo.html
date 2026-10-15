@@ -798,6 +798,18 @@
 
   ::selection { background: var(--hazard); color: var(--hazard-ink); }
 
+  /* ---------- F2 現場可讀性：戶外單手，文字 ≥16px、可點項目 ≥44px ---------- */
+  .brand-sub, #brandUserLabel, .case-pill-text, .case-pill-text small, #boundCaseLabel, .net-strip, #netLabel, .net-strip-hint,
+  .wifi-row, .section-label, .month-total, .entry *, .tag, .field-label, .field-hint, .field-prefix, .auto-note, .correction-note,
+  .receipt-info-title, .receipt-info-sub, .case-select-text, .case-select-text small, .signature-box-text, .signature-box-sub,
+  .chip, .sheet-title, .sheet-sub, .case-option-text, .case-option-text small, .screen-title, .btn, .more-toggle, .mini-btn,
+  .threshold-banner, .sig-header-sub, #toastText { font-size: 16px !important; }
+  .back-btn { width: 44px; height: 44px; }
+  .brand-user, .case-pill, .net-strip, .chip, .case-select, .mini-btn, .wifi-row { min-height: 44px; }
+  .brand-user, .net-strip, .wifi-row, .case-pill { display: flex; align-items: center; }
+  .field-box input, .field-box select { min-height: 44px; font-size: 18px; }
+  .entry-amount, .entry-store { font-size: 17px !important; }
+
   .demo-bar { max-width: 480px; margin: 0 auto; padding: 8px 16px; background: var(--steel-soft); color: var(--steel); font-size: 12px; line-height: 1.6; border-bottom: 1px solid var(--line); }
   .demo-bar summary { cursor: pointer; font-weight: 600; }
   .demo-bar .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
