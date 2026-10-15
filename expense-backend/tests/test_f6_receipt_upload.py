@@ -30,6 +30,7 @@ def finish(page, store="金勝五金行", category="五金材料", amount=None):
         page.click("#screen-review button:has-text('更多選項')")
     page.click(f"#categoryChips .chip:text-is('{category}')")
     page.click(".btn-submit")
+    page.click("#screen-result button:has-text('完成')")
 
 
 def row(server):

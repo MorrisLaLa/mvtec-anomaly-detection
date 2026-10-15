@@ -51,6 +51,7 @@ def submit_no_receipt(page, amount, store):
     page.click("#screen-review button:has-text('更多選項')")
     page.click("#categoryChips .chip:text-is('餐飲雜支')")
     page.click(".btn-submit")
+    page.click("#screen-result button:has-text('完成')")
 
 
 def test_submitter_flow_auto_approve_held_and_wifi_simulation(page):
@@ -92,6 +93,7 @@ def test_429_and_duplicate_rejection_show_reasons(page):
         page.click("#homeActionBar button:has-text('拍收據')")
         page.wait_for_selector("#screen-review", state="visible")
         page.click(".btn-submit")
+        page.click("#screen-result button:has-text('完成')")
         page.wait_for_selector("#screen-home", state="visible")
         page.wait_for_timeout(1500)
         page.wait_for_function("!document.querySelector('#entryList .entry').innerText.includes('等待送出')")

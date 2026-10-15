@@ -139,6 +139,7 @@ def submit_no_receipt(page, amount="120", store="測試店", category="五金材
         page.mouse.up()
         page.click("#sigOverlay button:has-text('確認簽名')")
     page.click(".btn-submit")
+    page.click("#screen-result button:has-text('完成')")
 
 
 def entry_text(page):

@@ -31,6 +31,7 @@ def test_photo_confirm_screen_hides_doc_type_and_submits_in_one_tap(server, page
     assert page.locator(VISIBLE_INPUTS).count() <= 3
     assert page.is_hidden("#docTypeChips")
     page.click(".btn-submit")                      # 只點一次：金額由發票 QR 帶入、店家可不填
+    page.click("#screen-result button:has-text('完成')")
     page.wait_for_selector("#screen-home", state="visible")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
     r = row(server)

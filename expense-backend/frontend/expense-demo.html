@@ -407,6 +407,11 @@
   }
   .action-bar .btn-primary { flex: 1 1 100%; min-height: 64px; font-size: 20px; }
   .action-bar .btn-secondary { flex: 1 1 0; min-height: 48px; font-size: 16px; }
+  .result { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 24px 20px; text-align: center; }
+  .result-title { font-size: 28px; font-weight: 700; line-height: 1.3; }
+  .result-sub { font-size: 18px; color: var(--ink-soft); }
+  .result-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+  .result-actions .btn { min-height: 56px; font-size: 18px; }
   .more-toggle { width: 100%; min-height: 48px; margin: 4px 0 10px; }
   .btn {
     border: none;
@@ -828,6 +833,15 @@
       <div class="onboard-badge">$</div>
       <div class="onboard-title" id="pairTitle">正在設定這支手機…</div>
       <div class="onboard-sub" id="pairMsg">請稍等，不需要輸入任何東西。</div>
+    </div>
+  </div>
+
+  <!-- ===== 送出後結果卡（全螢幕） ===== -->
+  <div id="screen-result" class="screen" style="display:none;">
+    <div class="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="result-actions" id="resultActions"></div>
     </div>
   </div>
 
@@ -1365,7 +1379,7 @@ function closeVoucherViewer(evt) {
 
 // ---------------- Screen switching ----------------
 function showScreen(id) {
-  ['screen-bind','screen-pair','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
+  ['screen-bind','screen-pair','screen-result','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
   });
   document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
@@ -1635,7 +1649,7 @@ async function submitEntry() {
     ? (ExpenseSync.networkKind() === 'unsupported' ? '已存檔，請在 Wi‑Fi 下按「立即上傳」' : '已存檔，連上 Wi‑Fi 後自動上傳')
     : (isOnline ? '申報送出中…' : '已離線存檔，恢復連線後自動上傳'));
   updateNetUI();
-  goHome();
+  showResult(entry.clientId);
   runSync();
 }
 
@@ -1771,6 +1785,33 @@ function friendlyReasons(rs) {
   const out = (rs || []).map(r => /^重複報銷/.test(r) ? '這張發票已經報過了' : r);
   return out.join('；') || '請洽管理員';
 }
+let resultClientId = null;
+function showResult(id) { resultClientId = id; renderResult(); showScreen('screen-result'); }
+function closeResult() { resultClientId = null; goHome(); }
+function recaptureFromResult() { resultClientId = null; startCapture('photo'); }
+function renderResult() {
+  const e = entries.find(x => x.clientId === resultClientId);
+  if (!e) return;
+  const done = '<button class="btn btn-secondary" onclick="closeResult()">完成</button>';
+  let title, sub = '', actions = done;
+  if (e.status === 'ok') { title = '✓ 已送出'; }
+  else if (e.status === 'review') { title = '主管確認中'; sub = '主管確認中，通過後不用再做什麼'; }
+  else if (e.status === 'rejected') {
+    title = '這張被退回：' + friendlyReasons(e.reviewReasons);
+    actions = '<button class="btn btn-primary" onclick="recaptureFromResult()">重新拍一張</button>' + done;
+  } else if (e.status === 'failed') {
+    title = failText(e);
+    actions = `<button class="btn btn-primary" onclick="resendFromResult('${e.clientId}')">重送</button>` + done;
+  } else if (e.status === 'waiting-wifi' || !isOnline) {
+    title = '已存好';
+    sub = '連上 Wi‑Fi 會自動送出';
+    if (e.status === 'waiting-wifi') actions = `<button class="btn btn-primary" onclick="forceUploadEntry('${e.clientId}')">現在用行動網路送出</button>` + done;
+  } else { title = '傳送中…'; sub = '請稍等'; }
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultSub').textContent = sub;
+  document.getElementById('resultActions').innerHTML = actions;
+}
+function resendFromResult(id) { resendEntry(id).then(renderResult); renderResult(); }
 function failText(e) {
   if (e.failStatus === 401) return '裝置未授權，請重新綁定';
   if (e.failStatus === 429) return `請求太頻繁，請約 ${Math.max(1, Math.ceil((e.retryAfter || 60) / 60))} 分鐘後再送`;
@@ -1932,6 +1973,7 @@ function onSyncFlush(r) {
   syncStalled = r.stalled; // 只有網路錯誤／5xx／逾時才算離線；單純還有新項目排隊不算
   updateNetUI();
   if (document.getElementById('screen-home').style.display !== 'none') renderHome();
+  if (document.getElementById('screen-result').style.display !== 'none') renderResult();
 
   if (r.failed.length) {
     showToast(failText({ failStatus: r.failed[0].status, retryAfter: r.failed[0].retryAfter, failMessage: r.failed[0].message }));
