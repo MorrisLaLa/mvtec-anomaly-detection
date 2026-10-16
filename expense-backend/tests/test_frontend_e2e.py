@@ -103,19 +103,14 @@ def page():
 
 
 def login(page, server, retry_ms=None, timeout_ms=None, policy="any", init_script=None, key=None):
-    """走真實的身份選擇 + 設定 PIN 流程。"""
+    """以預先放入的裝置金鑰開啟前台，姓名來自伺服器，直接進首頁。"""
     # 綁定畫面屬 F1（尚未實作）：暫時由測試直接把裝置金鑰放進本機儲存
     page.add_init_script(f"try {{ localStorage.setItem('expense_device_key', '{key or server.key}') }} catch (e) {{}}")
     if policy:  # 既有測試不關心 Wi-Fi 策略：預設「不限網路」；F1 測試傳 policy=None 以使用預設的僅 Wi-Fi
         page.add_init_script(f"try {{ localStorage.setItem('expense_upload_policy', '{policy}') }} catch (e) {{}}")
     if init_script:
         page.add_init_script(init_script)
-    page.goto(server.url + PAGE)
-    page.click(".user-option >> nth=0")
-    for _ in range(2):  # 設定 + 確認
-        for d in "1234":
-            page.click(f".pin-key:text-is('{d}')")
-        page.wait_for_timeout(300)
+    page.goto(server.url + PAGE)  # 姓名來自伺服器、PIN 預設關閉：直接進首頁
     page.wait_for_selector("#screen-home", state="visible")
     cfg = {k: v for k, v in {"RETRY_BASE_MS": retry_ms, "TIMEOUT_MS": timeout_ms}.items() if v}
     if cfg:
@@ -182,8 +177,6 @@ def test_queue_survives_reload_and_resends(server, page):
     page.wait_for_selector("#netStrip.offline")
     server.start()
     page.reload()  # 重新整理：佇列在 IndexedDB，載入後還原並自動重送
-    page.click(".pin-key:text-is('1')"); page.click(".pin-key:text-is('2')")
-    page.click(".pin-key:text-is('3')"); page.click(".pin-key:text-is('4')")
     page.wait_for_selector("#screen-home", state="visible")
     wait_pending_zero(page)
     assert len(server.query("SELECT 1 FROM expenses")) == 1

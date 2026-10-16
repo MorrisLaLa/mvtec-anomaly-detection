@@ -38,7 +38,7 @@ def test_bind_screen_rejects_bad_key_and_accepts_good_key(server, page):
     assert page.evaluate("ExpenseSync.getKey()") is None
     page.fill("#bindKey", server.key)
     page.click("#screen-bind button")
-    page.wait_for_selector("#screen-onboarding", state="visible")
+    page.wait_for_selector("#screen-home", state="visible")
     assert page.evaluate("ExpenseSync.getKey()") == server.key
 
 

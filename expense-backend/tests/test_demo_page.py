@@ -35,15 +35,6 @@ def bind(page, who):
     page.click("#screen-bind button")
 
 
-def setup_pin(page):
-    page.click(".user-option >> nth=0")
-    for _ in range(2):
-        for d in "1234":
-            page.click(f".pin-key:text-is('{d}')")
-        page.wait_for_timeout(300)
-    page.wait_for_selector("#screen-home", state="visible")
-
-
 def submit_no_receipt(page, amount, store):
     page.click("#homeActionBar button:has-text('沒有收據')")
     page.fill("#fieldAmount", str(amount))
@@ -56,8 +47,7 @@ def submit_no_receipt(page, amount, store):
 
 def test_submitter_flow_auto_approve_held_and_wifi_simulation(page):
     bind(page, "申報人")
-    page.wait_for_selector("#screen-onboarding", state="visible")
-    setup_pin(page)
+    page.wait_for_selector("#screen-home", state="visible")
     submit_no_receipt(page, 300, "便當店")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     submit_no_receipt(page, 1500, "零星採買")
@@ -72,7 +62,7 @@ def test_submitter_flow_auto_approve_held_and_wifi_simulation(page):
 
 def test_server_offline_then_recovers(page):
     bind(page, "申報人")
-    setup_pin(page)
+    page.wait_for_selector("#screen-home", state="visible")
     page.click("button[data-srv='offline']")
     submit_no_receipt(page, 200, "離線測試")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=等待送出")
@@ -82,7 +72,7 @@ def test_server_offline_then_recovers(page):
 
 def test_429_and_duplicate_rejection_show_reasons(page):
     bind(page, "申報人")
-    setup_pin(page)
+    page.wait_for_selector("#screen-home", state="visible")
     page.click("button[data-srv='429']")
     submit_no_receipt(page, 200, "限流測試")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=約 2 分鐘")
@@ -104,7 +94,7 @@ def test_429_and_duplicate_rejection_show_reasons(page):
 
 def test_reviewer_sees_seeded_queue_and_can_approve_and_reject(page):
     bind(page, "主管")
-    setup_pin(page)
+    page.wait_for_selector("#screen-home", state="visible")
     page.wait_for_selector("#reviewBar", state="visible")
     page.click("#reviewBar button")
     page.wait_for_selector("#reviewList .entry >> nth=1")

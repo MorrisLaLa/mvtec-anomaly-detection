@@ -20,8 +20,6 @@ def test_xss_not_executed_after_reload_from_queue(server, page):
     page.wait_for_selector("#netStrip.offline")
     server.start()
     page.reload()
-    page.click(".pin-key:text-is('1')"); page.click(".pin-key:text-is('2')")
-    page.click(".pin-key:text-is('3')"); page.click(".pin-key:text-is('4')")
     page.wait_for_selector("#screen-home", state="visible")
     page.wait_for_timeout(500)
     assert page.evaluate("window.__xss") is None

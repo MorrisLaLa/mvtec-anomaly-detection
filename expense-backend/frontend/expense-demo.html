@@ -857,23 +857,6 @@
     </div>
   </div>
 
-  <!-- ===== Onboarding / Identity Screen ===== -->
-  <div id="screen-onboarding" class="screen" style="display:none;">
-    <div class="onboard">
-      <div class="onboard-badge">$</div>
-      <div class="onboard-title">歡迎使用支出申報</div>
-      <div class="onboard-sub">這支手機接下來記錄的申報都會標記你的姓名，之後可以在「設定」隨時切換使用者。</div>
-      <div class="onboard-label">選擇你的姓名</div>
-      <div class="user-grid" id="userGrid"></div>
-      <div class="onboard-divider">或手動輸入</div>
-      <div class="onboard-manual">
-        <div class="field-box"><input type="text" id="manualUserInput" placeholder="輸入姓名"></div>
-        <button class="onboard-manual-btn" onclick="confirmManualUser()">開始使用</button>
-      </div>
-      <div class="pin-alt-link" style="text-align:center;" onclick="showBind()">重新綁定裝置金鑰</div>
-    </div>
-  </div>
-
   <!-- ===== 設定頁 ===== -->
   <div id="screen-settings" class="screen" style="display:none;">
     <div class="back-row">
@@ -914,7 +897,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H8l-6 7 6 7h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><path d="M14 10l4 4M18 10l-4 4"/></svg>
         </button>
       </div>
-      <div class="pin-alt-link" id="pinAltLink" onclick="pinAlt()">忘記 PIN？返回選擇身份</div>
+      <div class="pin-alt-link" id="pinAltLink" onclick="pinAlt()">忘記 PIN？</div>
     </div>
   </div>
 
@@ -1184,7 +1167,6 @@ let signatureDataURL = null;
 let sigCtx = null, sigDrawing = false, sigHasStroke = false;
 
 // ---------------- Identity ----------------
-const DEMO_USERS = ['王志明', '陳建宏', '李俊賢', '張家豪'];
 const USER_KEY = 'expense_demo_user';
 const PIN_KEY = 'expense_demo_pins';
 let currentUser = null;
@@ -1207,26 +1189,16 @@ function savePin(name, pin) {
 }
 function initials(name) { return name.slice(-2); }
 
-function renderUserGrid() {
-  const grid = document.getElementById('userGrid');
-  grid.innerHTML = '';
-  DEMO_USERS.forEach(name => {
-    const opt = document.createElement('div');
-    opt.className = 'user-option';
-    opt.onclick = () => chooseIdentity(name);
-    opt.innerHTML = `<div class="user-avatar">${escapeHtml(initials(name))}</div><div class="user-option-text">${escapeHtml(name)}</div>`;
-    grid.appendChild(opt);
-  });
-}
-function confirmManualUser() {
-  const val = document.getElementById('manualUserInput').value.trim();
-  if (!val) { showToast('請輸入姓名'); return; }
-  chooseIdentity(val);
-}
-function switchUser() {
-  renderUserGrid();
-  document.getElementById('manualUserInput').value = '';
-  showScreen('screen-onboarding');
+// 姓名一律來自伺服器的裝置名稱（沒有選姓名畫面）
+async function loginFromServer(skipPin) {
+  let name = loadUser() || '現場人員';
+  if (skipPin || ExpenseSync.autoAllowed()) { // 行動網路 + 僅 Wi‑Fi 策略時不連線，沿用已存的姓名
+    try {
+      const r = await api('/api/v1/me');
+      if (r.status === 200) name = (await r.json()).name || name;
+    } catch (e) { /* 離線：沿用已存的姓名 */ }
+  }
+  if (!skipPin && loadPins()[name]) chooseIdentity(name); else finishLogin(name);
 }
 
 // ---------------- PIN flow ----------------
@@ -1265,7 +1237,8 @@ function onPinToggle() {
   }
 }
 function pinAlt() {
-  if (pinContext === 'settings') { pinContext = 'unlock'; openSettings(); } else switchUser();
+  if (pinContext === 'settings') { pinContext = 'unlock'; openSettings(); }
+  else showToast('忘記 PIN？請向管理員索取新的連結，重新設定這支手機。');
 }
 
 function chooseIdentity(name) {
@@ -1278,14 +1251,14 @@ function chooseIdentity(name) {
     pinMode = 'unlock';
     document.getElementById('pinTitle').textContent = '歡迎回來，' + name;
     document.getElementById('pinSub').textContent = '輸入你的 4 位數 PIN 繼續';
-    document.getElementById('pinAltLink').textContent = '不是你本人？返回選擇身份';
+    document.getElementById('pinAltLink').textContent = '忘記 PIN？';
   } else {
     pinMode = 'setup';
     pinStage = 1;
     pinFirstEntry = '';
     document.getElementById('pinTitle').textContent = '設定你的 PIN';
     document.getElementById('pinSub').textContent = '第一次使用此身份，請設定 4 位數 PIN';
-    document.getElementById('pinAltLink').textContent = '選錯人了？返回選擇身份';
+    document.getElementById('pinAltLink').textContent = '取消';
   }
   renderPinDots();
   showScreen('screen-pin');
@@ -1438,7 +1411,7 @@ function closeVoucherViewer(evt) {
 
 // ---------------- Screen switching ----------------
 function showScreen(id) {
-  ['screen-bind','screen-pair','screen-result','screen-settings','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
+  ['screen-bind','screen-pair','screen-result','screen-settings','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
   });
   document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
@@ -1999,9 +1972,7 @@ async function submitBind() {
       ExpenseSync.setKey(key);
       showToast('已綁定這支手機');
       loadMe();
-      if (currentUser) { goHome(); return; }
-      const saved = loadUser();
-      if (saved) chooseIdentity(saved); else { renderUserGrid(); showScreen('screen-onboarding'); }
+      loginFromServer(true); // 姓名來自伺服器；重新綁定不再重問 PIN
     } else if (r.status === 401) err('金鑰無效、已過期或已被撤銷');
     else if (r.status === 429) err('嘗試次數過多，請稍後再試');
     else err('伺服器回應異常（' + r.status + '）');
@@ -2205,8 +2176,7 @@ if (pairMatch) {
 } else if (savedUser) {
   finishLogin(savedUser); // PIN 為選用、預設關閉：直接進首頁
 } else {
-  renderUserGrid();
-  showScreen('screen-onboarding');
+  loginFromServer(); // 已有金鑰但沒存姓名：姓名來自伺服器
 }
 </script>
 </body>
