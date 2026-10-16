@@ -1170,7 +1170,6 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
     } else if (it.doc_type === '無單據') {
       if (it.amount > 1000) r.push('無單據金額超過 NT$1,000，需人工審核');
     } else r.push('沒有可自動驗證的電子發票 QR，需人工審核');
-    if (!it.category || it.category === '待分類') r.push('分類尚未確定');
     return r.length ? { status: 'held', reasons: r } : { status: 'approved', reasons: [] };
   }
 

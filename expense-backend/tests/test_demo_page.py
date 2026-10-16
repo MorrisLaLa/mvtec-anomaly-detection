@@ -105,3 +105,15 @@ def test_reviewer_sees_seeded_queue_and_can_approve_and_reject(page):
     page.click("#rqSampled")
     page.wait_for_selector("#reviewList .entry")
     assert page.errors == []
+
+
+def test_blank_store_unclassified_is_auto_approved_in_demo(page):
+    """示範頁的模擬伺服器要和 M3 規則一致（使用者決定 2026-10-15）：用途未確定不轉主管確認。"""
+    bind(page, "申報人")
+    page.wait_for_selector("#screen-home", state="visible")
+    page.click("#homeActionBar button:has-text('沒有收據')")
+    page.fill("#fieldAmount", "200")
+    page.click(".btn-submit")                      # 店家與用途都不填
+    page.click("#screen-result button:has-text('完成')")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
+    assert page.errors == []
