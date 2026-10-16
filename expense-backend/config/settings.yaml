@@ -43,3 +43,6 @@ notify:
   log_path: data/notifications.log
   disk_alert_percent: 80
   held_overdue_days: 7
+# 備份（M4）。本機資料夾僅供測試／暫存；正式環境請改用雲端儲存桶（加密、限權、禁止公開）。
+backup:
+  local_dir: data/backups

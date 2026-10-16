@@ -33,6 +33,7 @@ class Settings:
     review_sample_percent: int = 10
     review_no_receipt_limit: int = 1000
     notify_recipient: str = ""
+    backup_local_dir: str = "data/backups"
     notify_log_path: str = "data/notifications.log"
     disk_alert_percent: int = 80
     held_overdue_days: int = 7
@@ -66,12 +67,13 @@ def load_settings() -> Settings:
         review_monthly_cap=int((raw.get("review") or {}).get("monthly_cap", 30000)),
         review_sample_percent=int((raw.get("review") or {}).get("sample_percent", 10)),
         review_no_receipt_limit=int((raw.get("review") or {}).get("no_receipt_limit", 1000)),
+        backup_local_dir=os.environ.get("EXPENSE_BACKUP_DIR", (raw.get("backup") or {}).get("local_dir", "data/backups")),
         notify_recipient=(raw.get("notify") or {}).get("recipient", ""),
         notify_log_path=os.environ.get("EXPENSE_NOTIFY_LOG", (raw.get("notify") or {}).get("log_path", "data/notifications.log")),
         disk_alert_percent=int((raw.get("notify") or {}).get("disk_alert_percent", 80)),
         held_overdue_days=int((raw.get("notify") or {}).get("held_overdue_days", 7)),
     )
-    for attr in ("db_path", "storage_dir", "access_log_dir", "notify_log_path"):
+    for attr in ("db_path", "storage_dir", "access_log_dir", "notify_log_path", "backup_local_dir"):
         p = Path(getattr(s, attr))
         if not p.is_absolute():
             setattr(s, attr, str(ROOT / p))
