@@ -37,3 +37,9 @@ review:
   monthly_cap: 30000          # 每裝置每月（台北時間）自動核准總額上限
   no_receipt_limit: 1000      # 無單據 ≤ 此金額自動核准，超過轉人工
   sample_percent: 10          # 自動核准案件中標記「抽查」的比例
+# 通知與維運檢查（M4）。目前通知只寫入記錄檔；Email 寄送需使用者提供寄信服務的帳號或機密後再接。
+notify:
+  recipient: "yys1114@gmail.com"
+  log_path: data/notifications.log
+  disk_alert_percent: 80
+  held_overdue_days: 7
