@@ -883,6 +883,20 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
     </div>
   </div>
 
+  <!-- ===== 設定頁 ===== -->
+  <div id="screen-settings" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l-8 8 8 8"/></svg>
+      </div>
+      <div class="back-title">設定</div>
+    </div>
+    <div class="onboard">
+      <label class="wifi-row"><input type="checkbox" id="pinEnabled" onchange="onPinToggle()"> 開啟 PIN（選用：每次開啟要輸入 4 位數）</label>
+      <div class="onboard-sub">PIN 只是這支手機本機的解鎖，不是必要的。手機遺失請通知管理員撤銷。</div>
+    </div>
+  </div>
+
   <!-- ===== PIN Screen (setup / unlock) ===== -->
   <div id="screen-pin" class="screen" style="display:none;">
     <div class="onboard" style="align-items:center; text-align:center;">
@@ -909,7 +923,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H8l-6 7 6 7h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><path d="M14 10l4 4M18 10l-4 4"/></svg>
         </button>
       </div>
-      <div class="pin-alt-link" id="pinAltLink" onclick="switchUser()">忘記 PIN？返回選擇身份</div>
+      <div class="pin-alt-link" id="pinAltLink" onclick="pinAlt()">忘記 PIN？返回選擇身份</div>
     </div>
   </div>
 
@@ -919,7 +933,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
       <div class="topbar-inner">
         <div class="brand">
           <div class="brand-title">支出申報</div>
-          <div class="brand-user" onclick="switchUser()">
+          <div class="brand-user" onclick="openSettings()">
             <span class="brand-sub" id="brandUserLabel">一六國際 · 現場人員</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l8 8-8 8"/></svg>
           </div>
@@ -1556,6 +1570,38 @@ let pinStage = 1;           // setup: 1 = first entry, 2 = confirm
 let pinBuffer = '';
 let pinFirstEntry = '';
 let pendingIdentity = null;
+let pinContext = 'unlock';  // 'unlock'（開啟 App 時）| 'settings'（從設定頁開啟 PIN）
+
+function openSettings() {
+  document.getElementById('pinEnabled').checked = !!(currentUser && loadPins()[currentUser]);
+  showScreen('screen-settings');
+}
+function onPinToggle() {
+  const box = document.getElementById('pinEnabled');
+  if (!currentUser) { box.checked = false; return; }
+  if (box.checked) {
+    pinContext = 'settings';
+    pendingIdentity = currentUser;
+    pinMode = 'setup'; pinStage = 1; pinFirstEntry = ''; pinBuffer = '';
+    document.getElementById('pinAvatar').textContent = initials(currentUser);
+    document.getElementById('pinError').textContent = '';
+    document.getElementById('pinTitle').textContent = '設定你的 PIN';
+    document.getElementById('pinSub').textContent = '請設定 4 位數 PIN';
+    document.getElementById('pinAltLink').textContent = '取消';
+    renderPinDots();
+    showScreen('screen-pin');
+  } else {
+    try {
+      const pins = loadPins();
+      delete pins[currentUser];
+      localStorage.setItem(PIN_KEY, JSON.stringify(pins));
+    } catch (err) { /* 略過 */ }
+    showToast('已關閉 PIN');
+  }
+}
+function pinAlt() {
+  if (pinContext === 'settings') { pinContext = 'unlock'; openSettings(); } else switchUser();
+}
 
 function chooseIdentity(name) {
   pendingIdentity = name;
@@ -1617,12 +1663,13 @@ function processPinEntry() {
     // stage 2 — confirm
     if (pinBuffer === pinFirstEntry) {
       savePin(pendingIdentity, pinBuffer);
-      finishLogin(pendingIdentity);
+      if (pinContext === 'settings') { pinContext = 'unlock'; showToast('已開啟 PIN'); openSettings(); }
+      else finishLogin(pendingIdentity);
     } else {
       pinStage = 1;
       pinFirstEntry = '';
       document.getElementById('pinTitle').textContent = '設定你的 PIN';
-      document.getElementById('pinSub').textContent = '第一次使用此身份，請設定 4 位數 PIN';
+      document.getElementById('pinSub').textContent = pinContext === 'settings' ? '請設定 4 位數 PIN' : '第一次使用此身份，請設定 4 位數 PIN';
       pinFail('兩次輸入不一致，請重新設定');
     }
   } else {
@@ -1726,7 +1773,7 @@ function closeVoucherViewer(evt) {
 
 // ---------------- Screen switching ----------------
 function showScreen(id) {
-  ['screen-bind','screen-pair','screen-result','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
+  ['screen-bind','screen-pair','screen-result','screen-settings','screen-onboarding','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
     document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
   });
   document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
