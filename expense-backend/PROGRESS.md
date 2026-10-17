@@ -376,3 +376,13 @@
 - 做了什麼：`app/backup.py`——`BackupTarget` 介面（put／get／versions／keys，保留舊版本）、`LocalBackupTarget`、通用 `ObjectStoreTarget`＋記憶體內 `FakeObjectClient`；`run_backup`（SQLite 用官方 backup API 取一致快照、圖片以雜湊增量上傳、寫 manifest、成功／失敗寫 `backup_ok`／`backup_failed` 事件並在失敗時通知）；`restore`（不覆蓋既有資料庫、逐檔比對雜湊）；`drill`（還原到暫存目錄、比對筆數與雜湊、輸出報告、結束清除暫存、失敗通知）；`python -m app.backup run|drill <目錄>`；設定檔 `backup.local_dir`。
 - 突變驗證：還原不驗雜湊、不做增量（每次全傳）、演練永遠回報通過，各自有測試變紅；其中「演練永遠通過」第一輪沒被抓到，我補了「線上收據與備份不同 → 演練失敗」測試後才變紅。
 - 限制：**GCS／S3 的實際轉接層尚未寫**（需要雲端帳號與 SDK，等使用者提供；介面與合約測試已就緒）；`restore` 還原圖片到指定資料夾，但資料庫裡存的是絕對路徑，若還原到不同路徑需另行處理（正式環境用固定的容器路徑）；Litestream 持續複寫尚未設定（屬部署，單元 3 以後）；演練比對「備份後被改過的線上收據」視為失敗，若日後允許修改圖片需調整；排程（每日備份、每季演練）尚未建立。
+
+---
+# 視窗 7 單元 3：容器、Caddy、compose、deploy/gcp 乾跑（M4 驗收 1、3、7、8、10、13 的設定面）（台北 2026-10-17）
+- 狀態：完成此單元；**視窗 7 未完成，WINDOWS.md 保持未勾選**。
+- 測試：新增 `tests/test_m4_deploy.py` 14 個，先確認紅（檔案不存在）再實作；**完整全套 291／291 通過**。
+- 做了什麼：`Dockerfile`（固定基底版本、非 root uid 10001、HEALTHCHECK 打 `/api/v1/health`）、`requirements-prod.txt`（固定版本，不含測試工具）、`.dockerignore`、`docker-compose.yml`（app：唯讀根檔案系統、非 root、cap_drop ALL、no-new-privileges、不對外開埠、只有 `/data` 可寫、`restart: unless-stopped`；caddy：只開 80／443）、`deploy/Caddyfile`（主機名稱用 `{$PUBLIC_HOSTNAME}` 佔位、HTTP 自動轉 HTTPS、本體上限 15MB 與應用程式一致、HSTS、CSP、nosniff、Referrer-Policy、Permissions-Policy）、`deploy/gcp/provision.sh`（`--dry-run` 只列出將建立的資源且完全不呼叫 gcloud；真正執行必須提供 PROJECT_ID 與 SSH_SOURCE_RANGE，否則拒絕）。
+- 驗證方式：CSP 用**真實瀏覽器**套到真實後端上，確認前台配對、送出流程沒有任何 CSP 違規；`provision.sh` 乾跑用假的 gcloud 驗證從未被呼叫；另有簡易機密掃描。
+- 突變驗證：CSP 拿掉 `'unsafe-inline'`（前台立刻壞）、compose 取消唯讀、SSH 來源改成全世界、Dockerfile 改用 root，各自有測試變紅。
+- 測試中修正自己的錯：SSH 測試第一版檢查「整份輸出不含 0.0.0.0/0」，但 80／443 本來就對全世界開放，改為只檢查 SSH 那幾行；這是修我自己剛寫的測試的範圍錯誤，沒有放寬對 SSH 的要求。
+- **沒有驗證的（誠實說明）：** 本環境的 docker 只有用戶端、沒有 daemon，也沒有 Caddy——**從未建置映像、從未啟動容器、從未跑過 Caddy**。因此驗收 1（HTTP→HTTPS 轉址實測）、2（殺程序 30 秒內恢復）、3（413 實測）、5（壞版本自動回復）、7 的 `docker inspect` 實測都**需要在有 docker 的機器演練**；基底映像標籤（`python:3.13.1-slim`、`caddy:2.8.4`）未對映像庫核對是否存在。CSP 目前仍需 `'unsafe-inline'`（前台使用行內腳本與 onclick），這是已知弱點，要移除需改寫前台。uptime check、磁碟告警、預算警示的 gcloud 指令尚未寫入腳本（需對照 Google 官方文件，列為待辦）。Litestream、自動更新、GitHub Actions（驗收 4）、自動回復尚未做。
