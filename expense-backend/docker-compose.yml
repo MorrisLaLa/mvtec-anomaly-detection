@@ -1,0 +1,37 @@
+# 本機或單台 VM：應用程式 + Caddy（自動 HTTPS）。機密與主機名稱一律由環境變數提供（.env 已被忽略）。
+#   PUBLIC_HOSTNAME=<你的主機名稱> docker compose up -d
+services:
+  app:
+    build: .
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    restart: unless-stopped
+    environment:
+      EXPENSE_DB_PATH: /data/expense.db
+      EXPENSE_STORAGE_DIR: /data/receipts
+      EXPENSE_LOG_DIR: /data/logs
+      EXPENSE_BACKUP_DIR: /data/backups
+      EXPENSE_NOTIFY_LOG: /data/notifications.log
+    volumes:
+      - expense-data:/data
+  caddy:
+    image: caddy:2.8.4
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?請設定 PUBLIC_HOSTNAME（主機名稱）}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  expense-data:
+  caddy-data:
+  caddy-config:
