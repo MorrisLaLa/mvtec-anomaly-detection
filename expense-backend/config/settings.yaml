@@ -29,6 +29,7 @@ logging:
   retention_days: 90          # 存取記錄保留天數（不含請求本體與金鑰）
 retention:
   retention_days: 1825        # 資料與圖片保存 5 年，到期由 `python -m app.maintenance purge` 刪除
+  purge_enabled: false        # 排程是否自動執行到期刪除。不可逆：請等會計確認「5 年」起算點後再改為 true
 # 自動審核規則（M3）。規則只能經由此設定檔與部署流程變更，不提供任何 API 修改。
 review:
   rule_version: v1            # 變更任何門檻時請同步改版本號；每筆決定都會記錄版本

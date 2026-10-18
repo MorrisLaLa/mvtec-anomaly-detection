@@ -386,3 +386,13 @@
 - 突變驗證：CSP 拿掉 `'unsafe-inline'`（前台立刻壞）、compose 取消唯讀、SSH 來源改成全世界、Dockerfile 改用 root，各自有測試變紅。
 - 測試中修正自己的錯：SSH 測試第一版檢查「整份輸出不含 0.0.0.0/0」，但 80／443 本來就對全世界開放，改為只檢查 SSH 那幾行；這是修我自己剛寫的測試的範圍錯誤，沒有放寬對 SSH 的要求。
 - **沒有驗證的（誠實說明）：** 本環境的 docker 只有用戶端、沒有 daemon，也沒有 Caddy——**從未建置映像、從未啟動容器、從未跑過 Caddy**。因此驗收 1（HTTP→HTTPS 轉址實測）、2（殺程序 30 秒內恢復）、3（413 實測）、5（壞版本自動回復）、7 的 `docker inspect` 實測都**需要在有 docker 的機器演練**；基底映像標籤（`python:3.13.1-slim`、`caddy:2.8.4`）未對映像庫核對是否存在。CSP 目前仍需 `'unsafe-inline'`（前台使用行內腳本與 onclick），這是已知弱點，要移除需改寫前台。uptime check、磁碟告警、預算警示的 gcloud 指令尚未寫入腳本（需對照 Google 官方文件，列為待辦）。Litestream、自動更新、GitHub Actions（驗收 4）、自動回復尚未做。
+
+---
+# 視窗 7 單元 4：維運排程器、CI、Dependabot（M4 驗收 4 的 CI 面）（台北 2026-10-18）
+- 狀態：完成此單元；**視窗 7 未完成，WINDOWS.md 保持未勾選**。
+- 測試：新增 `tests/test_m4_scheduler.py` 19 個，先確認紅（模組不存在）再實作；**完整全套 310／310 通過**。
+- 做了什麼：`app/scheduler.py`（台北時間；每日備份 03:10、每日檢查 09:00、每月 1 日報告 09:30、每季（1／4／7／10 月 1 日）還原演練 04:00；錯過時段當天補跑；每個工作每天最多一次；單一工作失敗不影響其他並發 `job_failed` 通知；狀態存檔）；compose 新增鎖定方式與 app 相同的 `ops` 服務；`.github/workflows/expense-ci.yml`（pytest、`pip-audit`、`bandit -r app -ll`；權限僅讀取、無機密、動作固定版本）；`.github/dependabot.yml`（pip、docker、github-actions 每週）。
+- **保存期限到期刪除（purge）預設關閉**：`retention.purge_enabled: false`，因為不可逆，須等會計確認「5 年」起算點、由使用者改為 true。
+- 順帶處理：`bandit -ll` 原本有 3 個中度提示。其中兩個 SQL 組字串是誤報（欄位／條件為固定字串、使用者輸入全走 `?` 參數；`/files` 的欄位名來自固定對照表），我加了 `# nosec B608` 並寫明理由，**沒有改程式行為**；另一個是排程器寫死 `/tmp`，改用 `tempfile.gettempdir()`。`pip-audit -r requirements-prod.txt` 在本機結果：無已知漏洞。
+- 突變驗證：purge 關閉判斷失效、取消「每天一次」、每季多算 11 月、失敗後不記錄狀態，各自有測試變紅。
+- 限制：**CI 工作流程從未在 GitHub 上實際跑過**（只驗證檔案內容與在本機分別跑過 pip-audit／bandit）；CI 內安裝 Playwright 瀏覽器的步驟未驗證；`main()` 迴圈與 `build_runners` 沒有被自動測試實際執行（只測了排程判斷與 `tick`）；部署工作（需要雲端帳號與機密）尚未加入；備份失敗後當天不會自動重試（會通知）；Litestream 持續複寫、自動系統更新、自動回復舊版仍未做；排程器的每日檢查與月報仍只寫記錄檔（Email 待寄信帳號）。

@@ -343,7 +343,7 @@ def export(request: Request, status: str = "", from_: str = Query("", alias="fro
         where.append("created_day <= ?"); args.append(to)
     if case_no:
         where.append("case_no = ?"); args.append(case_no)
-    sql = f"SELECT {', '.join(EXPORT_COLUMNS)} FROM expenses" + (f" WHERE {' AND '.join(where)}" if where else "") + " ORDER BY id"
+    sql = f"SELECT {', '.join(EXPORT_COLUMNS)} FROM expenses" + (f" WHERE {' AND '.join(where)}" if where else "") + " ORDER BY id"  # nosec B608 — 欄位與條件片段皆為固定字串，使用者輸入只經由 ? 參數傳入
     rows = db.execute(sql, args).fetchall()
     buf = io.StringIO()
     w = csv.writer(buf)

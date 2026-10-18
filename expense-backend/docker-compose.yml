@@ -17,6 +17,24 @@ services:
       EXPENSE_NOTIFY_LOG: /data/notifications.log
     volumes:
       - expense-data:/data
+  ops:  # 排程：每日備份／檢查、每月報告、每季還原演練（到期刪除預設關閉）
+    build: .
+    command: ["python", "-m", "app.scheduler"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    restart: unless-stopped
+    environment:
+      EXPENSE_DB_PATH: /data/expense.db
+      EXPENSE_STORAGE_DIR: /data/receipts
+      EXPENSE_LOG_DIR: /data/logs
+      EXPENSE_BACKUP_DIR: /data/backups
+      EXPENSE_NOTIFY_LOG: /data/notifications.log
+      EXPENSE_SCHEDULER_STATE: /data/scheduler-state.json
+    volumes:
+      - expense-data:/data
   caddy:
     image: caddy:2.8.4
     restart: unless-stopped

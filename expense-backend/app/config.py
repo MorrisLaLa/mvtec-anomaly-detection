@@ -32,6 +32,8 @@ class Settings:
     review_monthly_cap: int = 30000
     review_sample_percent: int = 10
     review_no_receipt_limit: int = 1000
+    retention_purge_enabled: bool = False
+    scheduler_state_path: str = "data/scheduler-state.json"
     notify_recipient: str = ""
     backup_local_dir: str = "data/backups"
     notify_log_path: str = "data/notifications.log"
@@ -68,12 +70,14 @@ def load_settings() -> Settings:
         review_sample_percent=int((raw.get("review") or {}).get("sample_percent", 10)),
         review_no_receipt_limit=int((raw.get("review") or {}).get("no_receipt_limit", 1000)),
         backup_local_dir=os.environ.get("EXPENSE_BACKUP_DIR", (raw.get("backup") or {}).get("local_dir", "data/backups")),
+        retention_purge_enabled=bool((raw.get("retention") or {}).get("purge_enabled", False)),
+        scheduler_state_path=os.environ.get("EXPENSE_SCHEDULER_STATE", (raw.get("retention") or {}).get("scheduler_state_path", "data/scheduler-state.json")),
         notify_recipient=(raw.get("notify") or {}).get("recipient", ""),
         notify_log_path=os.environ.get("EXPENSE_NOTIFY_LOG", (raw.get("notify") or {}).get("log_path", "data/notifications.log")),
         disk_alert_percent=int((raw.get("notify") or {}).get("disk_alert_percent", 80)),
         held_overdue_days=int((raw.get("notify") or {}).get("held_overdue_days", 7)),
     )
-    for attr in ("db_path", "storage_dir", "access_log_dir", "notify_log_path", "backup_local_dir"):
+    for attr in ("db_path", "storage_dir", "access_log_dir", "notify_log_path", "backup_local_dir", "scheduler_state_path"):
         p = Path(getattr(s, attr))
         if not p.is_absolute():
             setattr(s, attr, str(ROOT / p))

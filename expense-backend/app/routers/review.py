@@ -88,7 +88,7 @@ def get_file(expense_id: int, kind: str, request: Request, device=reviewer_only,
     col = KINDS.get(kind)
     if not col:
         raise HTTPException(404, "not found")
-    row = db.execute(f"SELECT {col} FROM expenses WHERE id = ?", (expense_id,)).fetchone()
+    row = db.execute(f"SELECT {col} FROM expenses WHERE id = ?", (expense_id,)).fetchone()  # nosec B608 — col 來自固定的 KINDS 對照表
     if not row or not row[0]:
         raise HTTPException(404, "not found")
     p = Path(row[0]).resolve()
