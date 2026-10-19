@@ -35,6 +35,21 @@ services:
       EXPENSE_SCHEDULER_STATE: /data/scheduler-state.json
     volumes:
       - expense-data:/data
+  litestream:  # 選用：docker compose --profile replicate up -d（需先設定 BACKUP_BUCKET 與 VM 服務帳號權限）
+    image: litestream/litestream:0.3.13
+    profiles: ["replicate"]
+    command: ["replicate", "-config", "/etc/litestream.yml"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    restart: unless-stopped
+    environment:
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-}   # 不設為必填：compose 會對未啟用 profile 的服務也做變數代換
+    volumes:
+      - expense-data:/data
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
   caddy:
     image: caddy:2.8.4
     restart: unless-stopped

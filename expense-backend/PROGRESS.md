@@ -396,3 +396,13 @@
 - 順帶處理：`bandit -ll` 原本有 3 個中度提示。其中兩個 SQL 組字串是誤報（欄位／條件為固定字串、使用者輸入全走 `?` 參數；`/files` 的欄位名來自固定對照表），我加了 `# nosec B608` 並寫明理由，**沒有改程式行為**；另一個是排程器寫死 `/tmp`，改用 `tempfile.gettempdir()`。`pip-audit -r requirements-prod.txt` 在本機結果：無已知漏洞。
 - 突變驗證：purge 關閉判斷失效、取消「每天一次」、每季多算 11 月、失敗後不記錄狀態，各自有測試變紅。
 - 限制：**CI 工作流程從未在 GitHub 上實際跑過**（只驗證檔案內容與在本機分別跑過 pip-audit／bandit）；CI 內安裝 Playwright 瀏覽器的步驟未驗證；`main()` 迴圈與 `build_runners` 沒有被自動測試實際執行（只測了排程判斷與 `tick`）；部署工作（需要雲端帳號與機密）尚未加入；備份失敗後當天不會自動重試（會通知）；Litestream 持續複寫、自動系統更新、自動回復舊版仍未做；排程器的每日檢查與月報仍只寫記錄檔（Email 待寄信帳號）。
+
+---
+# 視窗 7 單元 5：Litestream、自動系統更新、VM 開機腳本、手動一鍵回復（M4 驗收 5 的降級版）（台北 2026-10-19）
+- 狀態：完成此單元；**視窗 7 的「不需要使用者資料」部分已做完，但視窗 7 仍未勾選**（見下方未完成清單）。
+- 測試：新增 `tests/test_m4_vm.py` 8 個，先確認紅再實作；**完整全套 318／318 通過**。
+- 做了什麼：`deploy/litestream.yml`（SQLite 持續複寫到 GCS 儲存桶、保留 30 天還原點、憑證走 VM 服務帳號不寫檔）＋ compose 的 `litestream` 服務（`--profile replicate` 才啟用、固定版本、非 root、唯讀）；`deploy/gcp/vm/50unattended-upgrades-expense`（只裝安全更新，自動重開時間 UTC 18:30＝台北 02:30，早於 03:10 備份）；`deploy/gcp/vm/startup.sh`（安裝 docker、啟用自動更新、SSH 僅金鑰且禁止 root）；`deploy/rollback.sh <git-ref> [--dry-run]`（規格允許的降級：手動一鍵回復並等健康檢查；版本名稱嚴格驗證，拒絕 `;`、`$()`、`..`、開頭 `-`）。
+- 突變驗證：重開時間改到上班時間、取消版本名稱驗證、SSH 允許密碼、Litestream 設定寫入憑證、litestream 不設 profile，各自有測試變紅。
+- 自己抓到的問題：compose 會對**未啟用 profile 的服務**也做變數代換，所以 litestream 的 `BACKUP_BUCKET` 不能設成必填（`:?`），否則沒設該變數時整個 `docker compose up` 會失敗；已改為可空。此行為來自我對 compose 的了解，**尚未在真實 compose 上驗證**。
+- **沒有驗證的（誠實說明）：** 全部是設定／腳本內容檢查與乾跑。從未啟動 Litestream（映像版本 0.3.13 未對映像庫核對；Litestream 需要資料庫為 WAL 模式，我預期它會自行切換，但未驗證，且應用程式目前沒有設定 WAL）、從未在 VM 上跑 startup.sh、未驗證 unattended-upgrades 設定語法被 apt 接受、rollback.sh 只測了乾跑與參數驗證，**未在真實 docker 上回復過**。回復只涵蓋程式碼版本；資料庫若已做過不可逆的結構變更需另行處理。
+- 視窗 7 仍未完成的項目（都需要使用者資料或有 docker 的環境）：①在有 docker 的機器實際演練驗收 1、2、3、5、7；②GCS／S3 的備份轉接層（需雲端帳號與 SDK）；③uptime check、磁碟告警、預算警示的 gcloud 指令（需對照官方文件）；④Email 寄送（需寄信帳號）；⑤部署用 GitHub Actions 工作（需雲端帳號與機密）；⑥網域或 Tailscale 決定；⑦會計確認 5 年起算點後才能啟用 purge。
