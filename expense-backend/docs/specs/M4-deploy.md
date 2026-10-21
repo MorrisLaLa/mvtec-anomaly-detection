@@ -85,3 +85,11 @@
 - 寄信服務的帳號或機密（若要由應用程式寄信）。
 - 網域名稱（或決定改走 Tailscale）。
 - 之後要用 AWS 時的 AWS 帳號。
+
+---
+## 修訂 3（台北 2026-10-21）：免費額度部署選項
+使用者詢問能否部署在 Google 免費額度。查證（**第三方整理，未取得 Google 官方頁面，上線前須核對**）：常駐免費額度為 1 台 e2-micro、30GB 標準硬碟、每月 1GB 北美出站流量，**僅限美國 us-west1／us-central1／us-east1**；Cloud Storage 免費 5GB 同樣只在這三區。
+- 影響：**免費＝資料放美國（跨境）**。收據含統編等個資，須由使用者決定可否接受並在隱私說明載明；要留台灣就用預設的 `asia-east1`（需付費，價格尚未查）。
+- 實作：`deploy/gcp/provision.sh --free-tier`（e2-micro、pd-standard 30GB、us-central1，並輸出跨境警告；拒絕非免費區域）；真正執行必須設定 `BUDGET_AMOUNT`（超額會計費，一定要預算警示）；`startup.sh` 在記憶體 <2GB 時自動加 1GB swap。
+- 建議流程：先用免費美國 VM 演練容器行為（尚無真實個資、無跨境問題），正式上線前再決定區域；切換區域只需改 `REGION`／`ZONE` 參數，程式不用改。
+- e2-micro（約 1GB 記憶體）是否撐得住 app＋Caddy＋排程器（＋Litestream）**未實測**。

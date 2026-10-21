@@ -23,5 +23,14 @@ PermitRootLogin no
 CONF
 systemctl reload ssh || systemctl reload sshd
 
+# 小記憶體機型（例如免費的 e2-micro，約 1GB）加 1GB swap，避免記憶體不足被系統砍程序
+if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -lt 2000000 ] && ! swapon --show | grep -q /swapfile; then
+  fallocate -l 1G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 systemctl enable --now docker
 echo "VM 初始化完成。接著請放入專案、建立 .env（PUBLIC_HOSTNAME、BACKUP_BUCKET），再執行 docker compose up -d。"
