@@ -33,4 +33,4 @@ if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -lt 2000000 ] && ! swapon --
 fi
 
 systemctl enable --now docker
-echo "VM 初始化完成。接著請放入專案、建立 .env（PUBLIC_HOSTNAME、BACKUP_BUCKET），再執行 docker compose up -d。"
+echo "VM 初始化完成。接著請放入專案、建立 .env：設定 COMPOSE_PROFILES（無網域用 funnel，有網域用 domain 並設 PUBLIC_HOSTNAME；要 Litestream 再加 replicate 並設 BACKUP_BUCKET），再執行 docker compose up -d。"

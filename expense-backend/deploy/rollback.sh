@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 手動一鍵回復到指定的版本（git 標籤或提交）。用法：deploy/rollback.sh <git-ref> [--dry-run]
-# 在專案根目錄（有 docker-compose.yml 的地方）執行。回復後會等健康檢查通過；失敗會明講並保留現況供你處理。
+# 在專案根目錄（有 docker-compose.yml 的地方）執行；入口代理由 .env 的 COMPOSE_PROFILES 決定（funnel 或 domain），沒設定就不會啟動代理。回復後會等健康檢查通過；失敗會明講並保留現況供你處理。
 set -euo pipefail
 
 REF="${1:-}"

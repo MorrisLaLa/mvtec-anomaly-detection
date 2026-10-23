@@ -423,7 +423,17 @@
 1. **需要有 docker 的機器實際演練**（本環境只有 docker 用戶端）：驗收 1（HTTP→HTTPS 轉址）、2（殺程序 30 秒內恢復）、3（413 在代理層）、5（壞版本回復）、7（`docker inspect` 非 root／唯讀）；以及 Litestream、`rollback.sh`、`startup.sh`、`provision.sh` 的實機驗證。映像標籤 `python:3.13.1-slim`、`caddy:2.8.4`、`litestream/litestream:0.3.13` 未核對存在。
 2. **需要使用者的雲端帳號**：GCS／S3 備份轉接層；部署用 GitHub Actions 工作（需雲端帳號與機密）；uptime check、磁碟告警、預算警示的 gcloud 指令（另需對照 Google 官方文件）。
 3. **需要寄信服務的帳號或機密**：Email 寄送（目前通知只寫記錄檔）。
-4. **需要使用者決定**：網域名稱或改走 Tailscale；正式資料可否放美國（免費額度只在美國區域）或一定要留台灣。
+4. **需要使用者決定**：（網域已不需要：改走 Tailscale Funnel，待實機與官方核對，見單元 7）；正式資料可否放美國（免費額度只在美國區域）或一定要留台灣。
 5. **需要會計確認**：「5 年」起算點；確認前保持 `retention.purge_enabled: false`。
 6. **真實收據照片樣本**：辨識功能上線前驗證用。
 下一個視窗：**8 資安審查與對抗測試**（WINDOWS.md 標示應使用 Opus）。不依賴上列資料即可進行。
+
+---
+# 視窗 7 單元 7：不需要網域的 HTTPS——Tailscale Funnel 路線（台北 2026-10-23）
+- 起因：使用者質疑為何需要網域（其工作日誌用 GitHub Pages＋Apps Script＋試算表）。決定選 A：維持現有程式，找不需網域的方式（規格 `M4-deploy.md` 修訂 4；Apps Script 改寫方案評估後不採用，理由同規格）。
+- 查證：Funnel 需求見規格；sslip.io 這類共用網域有 Let's Encrypt 簽發上限問題，不建議。
+- 測試：新增 `tests/test_m4_funnel.py` 9 個，先確認紅再實作；**完整全套 334／334 通過**。
+- 做了什麼：`deploy/Caddyfile.funnel`、compose 的 `caddy-funnel`（profile `funnel`，只綁 127.0.0.1:8080）、原 `caddy` 改為 profile `domain`、`deploy/funnel/enable.sh`（`--dry-run`）與 README（前置條件、未驗證項目）。`PUBLIC_HOSTNAME` 由必填改為可空（compose 會對未啟用 profile 的服務也代換變數）。
+- 自己抓到的連帶問題：加 profile 後，沒設定 `COMPOSE_PROFILES` 時單純 `docker compose up`（含 `rollback.sh`）不會啟動任何入口代理；已先補測試（紅）再補 README／開機腳本／回復腳本的說明。
+- 突變驗證：funnel 版 CSP 與網域版分歧、8080 改成對外、PUBLIC_HOSTNAME 改回必填、移除 `auto_https off`，各自有測試變紅。
+- 限制：**全部從未在真實機器上跑過**；Funnel 指令語法與免費方案可用性未核對官方；**來源 IP／限流在 Funnel 後是否正確未驗證**（上線前必驗，見規格修訂 4）；`COMPOSE_PROFILES` 行為依我對 compose 的了解，未實測。視窗 7 卡住清單中「網域或 Tailscale 決定」改為：已決定走 Funnel（待實機驗證與官方核對）。

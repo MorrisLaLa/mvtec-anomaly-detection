@@ -1,5 +1,6 @@
 # 本機或單台 VM：應用程式 + Caddy（自動 HTTPS）。機密與主機名稱一律由環境變數提供（.env 已被忽略）。
-#   PUBLIC_HOSTNAME=<你的主機名稱> docker compose up -d
+#   有網域：PUBLIC_HOSTNAME=<你的主機名稱> docker compose --profile domain up -d
+#   沒網域：docker compose --profile funnel up -d  （再用 Tailscale Funnel 取得 https 網址，見 deploy/funnel/README.md）
 services:
   app:
     build: .
@@ -50,8 +51,20 @@ services:
     volumes:
       - expense-data:/data
       - ./deploy/litestream.yml:/etc/litestream.yml:ro
-  caddy:
+  caddy-funnel:  # 不需要網域：docker compose --profile funnel up -d，再執行 deploy/funnel/enable.sh
     image: caddy:2.8.4
+    profiles: ["funnel"]
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "127.0.0.1:8080:8080"   # 只開給本機的 Tailscale Funnel，不直接對外
+    volumes:
+      - ./deploy/Caddyfile.funnel:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+  caddy:  # 有網域時：docker compose --profile domain up -d
+    image: caddy:2.8.4
+    profiles: ["domain"]
     restart: unless-stopped
     depends_on: [app]
     ports:
@@ -59,7 +72,7 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?請設定 PUBLIC_HOSTNAME（主機名稱）}
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-}   # 不設為必填：compose 會對未啟用 profile 的服務也做變數代換；domain 路線請務必設定
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

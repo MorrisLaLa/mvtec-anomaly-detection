@@ -37,7 +37,7 @@
 ```
 cd expense-backend
 pip install -r requirements.txt   # 另需系統套件 libzbar0（apt-get update && apt-get install -y libzbar0）
-python -m pytest -q               # 目前 325 個，約 4–5 分鐘
+python -m pytest -q               # 目前 334 個，約 4–5 分鐘
 ```
 瀏覽器測試用 `/opt/pw-browsers/chromium`，**不要執行 `playwright install`**。本環境 docker 只有用戶端、沒有 daemon，也沒有 Caddy。
 
@@ -45,5 +45,6 @@ python -m pytest -q               # 目前 325 個，約 4–5 分鐘
 - 後端：FastAPI + SQLite（`app/`）。M1 裝置金鑰與角色、配對碼；M2 收件加固；M3 自動審核（用途未確定**不**轉主管確認，使用者已決定）與審核畫面；M4 通知／維運檢查（`ops.py`）、備份／還原／演練（`backup.py`）、排程器（`scheduler.py`，到期刪除 purge 預設**關閉**）。
 - 前台：`frontend/expense-demo.html` 與 `sync.js`；視窗 6b 已完成（配對連結零輸入、拍收據大按鈕、工地用語、結果卡、設定頁 PIN 選用開關、姓名一律來自伺服器）。示範版由 `scripts/build_demo.py` 打包成 `frontend/demo.html`，**已發布為 Artifact**（https://claude.ai/artifact/4ZTt1Fii5jqgKEaiDLkMVh ，私人；更新時用同一檔案路徑發布）。
 - 部署：`Dockerfile`、`docker-compose.yml`（app／ops／caddy／選用 litestream）、`deploy/Caddyfile`、`deploy/gcp/provision.sh`（`--dry-run`、`--free-tier`）、`deploy/gcp/vm/*`、`deploy/rollback.sh`、`.github/workflows/expense-ci.yml`、`.github/dependabot.yml`。**全部只做過內容／乾跑檢查，從未實際啟動容器。**
-- 待使用者提供（會阻擋對應工作，不要自行編造）：網域名稱（或改走 Tailscale）、Google Cloud 專案與帳單帳號、寄信服務帳號或機密、會計對「5 年」起算點的確認、真實收據照片樣本、正式資料可否放美國（免費額度只在美國區域）。
+- **不需要網域**：使用者選擇 Tailscale Funnel（規格 M4 修訂 4、`deploy/funnel/`），待實機驗證；Apps Script＋試算表方案評估後不採用。入口代理由 `.env` 的 `COMPOSE_PROFILES`（funnel／domain）決定。
+- 待使用者提供（會阻擋對應工作，不要自行編造）：Google Cloud 專案與帳單帳號、寄信服務帳號或機密、會計對「5 年」起算點的確認、真實收據照片樣本、正式資料可否放美國（免費額度只在美國區域）。
 - 夜間排程 `trig_01VhULHWTZZBRQrEuvZoezmR` 暫停中。不要恢復或修改。

@@ -93,3 +93,11 @@
 - 實作：`deploy/gcp/provision.sh --free-tier`（e2-micro、pd-standard 30GB、us-central1，並輸出跨境警告；拒絕非免費區域）；真正執行必須設定 `BUDGET_AMOUNT`（超額會計費，一定要預算警示）；`startup.sh` 在記憶體 <2GB 時自動加 1GB swap。
 - 建議流程：先用免費美國 VM 演練容器行為（尚無真實個資、無跨境問題），正式上線前再決定區域；切換區域只需改 `REGION`／`ZONE` 參數，程式不用改。
 - e2-micro（約 1GB 記憶體）是否撐得住 app＋Caddy＋排程器（＋Litestream）**未實測**。
+
+---
+## 修訂 4（台北 2026-10-23）：不需要網域的 HTTPS——Tailscale Funnel（使用者選 A）
+使用者質疑「為什麼一定要網域」（其工作日誌放 GitHub Pages＋Apps Script／試算表，不需自備網域）。結論：**網域不是必要條件**，只是 VM＋Caddy 自動憑證的前提。評估後**不改寫成 Apps Script＋試算表**（需整個後端重寫、讀不到標頭／狀態碼受限／無交易，安全與稽核較弱），維持現有程式。
+- **採用 Tailscale Funnel**（查證：官方文件說明需 Tailscale ≥1.38.3、MagicDNS、HTTPS、ACL 的 funnel 屬性；只能用 `ts.net` 名稱、埠 443／8443／10000；有不可設定的頻寬上限；訪客不需安裝 Tailscale。**免費方案可用與否只有第三方文章說可用，須核對官方價格頁**）。
+- **不建議萬用 DNS（sslip.io）**：搜尋結果顯示共用網域會撞 Let's Encrypt 的憑證簽發上限，已有人因此失敗。
+- 實作：`deploy/Caddyfile.funnel`（本機 8080 HTTP、`auto_https off`，安全標頭與 15MB 上限與有網域版一致，測試比對）；compose 以 profile 區分入口：`funnel`（`caddy-funnel`，只綁 127.0.0.1:8080）、`domain`（原 `caddy`）；`deploy/funnel/enable.sh`（`--dry-run`）與 README。**入口代理改由 `.env` 的 `COMPOSE_PROFILES` 決定**，沒設定就只有 app／ops 啟動、外面連不進來。
+- ⚠ 上線前必驗：經 Funnel→Caddy 後應用程式看到的來源 IP 是否為真實手機 IP（影響 M1 失敗封鎖；若是代理 IP，所有人共用同一個失敗計數）。
