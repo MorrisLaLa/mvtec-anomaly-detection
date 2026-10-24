@@ -61,6 +61,14 @@ const DEMO_RECEIPTS = [
   { type: 'receipt', store: '阿明小吃部', amount: 180, hasTax: false },
 ];
 let receiptCursor = 0;
+// 示範專用：Artifact 檢視器不允許一般下載，改用它的 downloads 功能（會先請你確認）；在其他地方開則照常下載
+const browserSaveFile = saveFile;
+window.saveFile = async function (filename, blob) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (!dl) return browserSaveFile(filename, blob);
+  try { await dl.save({ filename, data: blob }); return true; }
+  catch (e) { showToast(e && e.code === 'declined' ? '已取消下載' : '這裡無法下載檔案'); return false; }
+};
 window.startCapture = function (source) {
   document.getElementById('processingText').textContent = source === 'photo' ? '正在辨識拍攝的單據…' : '正在辨識上傳的單據…';
   showScreen('screen-processing');

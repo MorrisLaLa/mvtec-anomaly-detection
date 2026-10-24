@@ -30,6 +30,22 @@
   const pub = (it) => { const { device, ...rest } = it; return rest; };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  const hasReceipt = (x) => !!x.doc_type && x.doc_type !== '無單據';
+  // 示範沒有真的照片：依申報內容畫一張標明「示範」的發票圖，讓主管能試「看收據」
+  function demoReceipt(it) {
+    const cv = document.createElement('canvas'); cv.width = 480; cv.height = 640;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 480, 640);
+    g.strokeStyle = '#999'; g.lineWidth = 2; g.strokeRect(10, 10, 460, 620);
+    g.fillStyle = '#111'; g.textAlign = 'center';
+    g.font = 'bold 26px sans-serif'; g.fillText(it.doc_type === '統一發票' ? '電子發票證明聯' : '收據', 240, 70);
+    g.font = '18px sans-serif'; g.fillText(it.store || '（未填店家）', 240, 120);
+    g.font = 'bold 40px sans-serif'; g.fillText('NT$ ' + Number(it.amount || 0).toLocaleString('en-US'), 240, 220);
+    g.font = '18px sans-serif'; g.fillText(it.created_day || '', 240, 270);
+    g.fillStyle = '#C1440E'; g.font = 'bold 30px sans-serif'; g.fillText('示範圖片・非真實單據', 240, 420);
+    return new Promise((res) => cv.toBlob(res, 'image/png'));
+  }
+
   function decide(it) {
     const r = [];
     if (it.doc_type === '統一發票') {   // 示範：拍照辨識為模擬，視為 QR 驗證成功
@@ -114,7 +130,8 @@
     }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');
-      return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1'))).map(pub));
+      return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1')))
+        .map((x) => ({ ...pub(x), files: { ...(x.files || {}), receipt: hasReceipt(x) } })));
     }
     let m = path.match(/^\/review\/(\d+)\/decision$/);
     if (m && method === 'POST') {
@@ -132,7 +149,8 @@
     }
     m = path.match(/^\/files\/(\d+)\/(\w+)$/);
     if (m) {
-      const b = (blobs[+m[1]] || {})[m[2]];
+      const it = state.items.find((x) => x.id === +m[1]);
+      const b = m[2] === 'receipt' ? (it && hasReceipt(it) ? await demoReceipt(it) : null) : (blobs[+m[1]] || {})[m[2]];
       return b ? new Response(b, { status: 200, headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } }) : json(404, { detail: 'not found' });
     }
     return json(404, { detail: 'not found' });

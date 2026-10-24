@@ -1994,6 +1994,14 @@ function openReviewQueue() {
   if (!document.getElementById('exportTo').value) document.getElementById('exportTo').value = today;
   showScreen('screen-reviewq'); loadReviewQueue('held');
 }
+async function saveFile(filename, blob) {  // 存檔；其他打包版本可改寫這個函式
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return true;
+}
 async function exportCsv() {
   const f = document.getElementById('exportFrom').value, t = document.getElementById('exportTo').value;
   if (f && t && f > t) { showToast('開始日期不能晚於結束日期'); return; }
@@ -2005,12 +2013,8 @@ async function exportCsv() {
     if (!r.ok) { showToast(r.status === 403 ? '只有主管或管理員可以匯出' : '匯出失敗（' + r.status + '）'); return; }
     const text = await r.text();
     // 加上 BOM，Excel 才會以 UTF-8 開啟，中文不會變亂碼
-    const url = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `支出申報_${f || '最早'}_至_${t || '最新'}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+    if (!await saveFile(`支出申報_${f || '最早'}_至_${t || '最新'}.csv`, blob)) return;
     const n = Math.max(0, text.trim().split('\n').length - 1);
     showToast(n ? `已匯出 ${n} 筆` : '這段期間沒有申報（已匯出空白表）');
   } catch (e) { showToast('連不上伺服器'); }

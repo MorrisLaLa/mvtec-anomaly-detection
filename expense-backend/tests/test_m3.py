@@ -207,6 +207,7 @@ def test_reject_requires_comment(env):
 
 def test_unknown_id_404_and_non_sampled_auto_approved_cannot_be_changed(env):
     c, keys, conn, s = env
+    s.review_sample_percent = 0  # 抽樣改用隨機伺服器秘密後（S2），10% 機率被抽中；本測試要的是「未被抽查」
     assert c.post("/api/v1/review/999/decision", json={"decision": "approve"}, headers=H(keys["乙"])).status_code == 404
     submit(as_(c, keys, "甲"), keys["甲"], "AA", {"amount": "210"}, qr=qr_text(date=TODAY, no=inv()))
     assert c.post(f"/api/v1/review/{item_id(conn, 'AA')}/decision", json={"decision": "reject", "comment": "x"},

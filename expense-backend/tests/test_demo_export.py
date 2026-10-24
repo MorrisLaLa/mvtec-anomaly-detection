@@ -16,3 +16,29 @@ def test_demo_reviewer_exports_csv(page):
     assert text.splitlines()[0].startswith("id,client_id,case_no")
     assert "現場零星採買" in text and "阿明小吃部" in text
     assert page.errors == []
+
+
+def test_demo_uses_artifact_downloads_when_available(page):
+    """在 Artifact 檢視器裡一般下載無效：有 claude.use('downloads') 時必須改用它。"""
+    page.evaluate("""() => { window.__saved = null; window.claude = { use: async (n) => n === 'downloads' ? {
+        save: async (req) => { window.__saved = { filename: req.filename, text: await req.data.text(), bom: new Uint8Array(await req.data.arrayBuffer())[0] }; return { status: 'saved' }; } } : null }; }""")
+    bind(page, "主管（")
+    page.wait_for_selector("#reviewBar", state="visible")
+    page.click("#reviewBar button")
+    page.wait_for_selector("#screen-reviewq", state="visible")
+    page.click("#exportBtn")
+    page.wait_for_function("window.__saved !== null", timeout=10000)
+    saved = page.evaluate("window.__saved")
+    assert saved["filename"].endswith(".csv") and saved["bom"] == 0xEF
+    assert "client_id" in saved["text"]
+    page.wait_for_selector("#toast >> text=已匯出")
+
+
+def test_demo_declined_download_says_cancelled(page):
+    page.evaluate("""() => { window.claude = { use: async () => ({ save: async () => { throw { code: 'declined', message: 'no' }; } }) }; }""")
+    bind(page, "主管（")
+    page.wait_for_selector("#reviewBar", state="visible")
+    page.click("#reviewBar button")
+    page.wait_for_selector("#screen-reviewq", state="visible")
+    page.click("#exportBtn")
+    page.wait_for_selector("#toast >> text=已取消下載", timeout=10000)
