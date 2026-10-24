@@ -52,8 +52,7 @@ def test_field_staff_home_stays_simple(server, page):
     submit_no_receipt(page)
     page.wait_for_selector("#entryList .entry")
     assert page.is_hidden("#reviewBar")
-    visible = page.evaluate("""() => [...document.querySelectorAll('button')].filter(b => b.checkVisibility({checkVisibilityCSS: true}) && (() => {
-                                       const r = b.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; })())
+    visible = page.evaluate("""() => [...document.querySelectorAll('button')].filter(b => b.checkVisibility({checkVisibilityCSS: true}))
                                      .map(b => b.textContent.trim()).filter(Boolean)""")
     assert sorted(visible) == sorted(["拍收據", "從相簿選", "沒有收據"]), visible
     page.click(".brand-user")
