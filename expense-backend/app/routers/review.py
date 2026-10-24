@@ -46,12 +46,15 @@ def _item(r):
 @router.get("/review/items")
 def items(status: str = "held", sampled: int | None = None, limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
           device=reviewer_only, db=Depends(get_db)):
-    if status not in ("held", "approved", "rejected"):
-        raise HTTPException(422, "status 只能是 held／approved／rejected")
-    sql, args = "SELECT * FROM expenses WHERE review_status = ?", [status]
+    if status not in ("held", "approved", "rejected", "done"):
+        raise HTTPException(422, "status 只能是 held／approved／rejected／done")
+    if status == "done":  # 已處理：核准與退回，最新的在前（使用者 2026-10-24）
+        sql, args = "SELECT * FROM expenses WHERE review_status IN ('approved', 'rejected')", []
+    else:
+        sql, args = "SELECT * FROM expenses WHERE review_status = ?", [status]
     if sampled is not None:
         sql += " AND sampled = ?"; args.append(int(bool(sampled)))
-    sql += " ORDER BY id LIMIT ? OFFSET ?"
+    sql += (" ORDER BY id DESC" if status == "done" else " ORDER BY id") + " LIMIT ? OFFSET ?"
     return [_item(r) for r in db.execute(sql, args + [limit, offset])]
 
 

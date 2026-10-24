@@ -797,6 +797,7 @@
   .mini-btn.danger { color:var(--alert); border-color:var(--alert); }
   .export-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 18px; border-top:1px solid var(--line); color:var(--ink-soft); }
   .rq-pick { -webkit-appearance:checkbox; appearance:auto; width:24px; height:24px; margin:0 4px 0 0; flex:none; }
+  #historySheet:not(.show) { visibility: hidden; }  /* 收起時不可見、也不能用鍵盤點到 */
   .history-step { padding:8px 0; border-bottom:1px solid var(--line); font-size:16px; line-height:1.5; }
   .history-step small { display:block; color:var(--ink-soft); }
   .export-row input { border:1.5px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); padding:6px 8px; min-height:44px; font-size:16px; }
@@ -984,6 +985,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
     <div class="wifi-row" style="gap:8px;">
       <button class="mini-btn" id="rqHeld" onclick="loadReviewQueue('held')">待處理</button>
       <button class="mini-btn" id="rqSampled" onclick="loadReviewQueue('sampled')">自動核准・抽查</button>
+      <button class="mini-btn" id="rqDone" onclick="loadReviewQueue('done')">已處理</button>
     </div>
     <div class="export-row">
       <span>申報日期</span>
@@ -1352,7 +1354,8 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
     }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');
-      return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1')))
+      const match = (x) => st === 'done' ? x.review_status !== 'held' : x.review_status === st;
+      return json(200, state.items.filter((x) => match(x) && (sp === null || !!x.sampled === (sp === '1'))).slice().sort((a, b) => st === 'done' ? b.id - a.id : a.id - b.id)
         .map((x) => ({ ...pub(x), files: { ...(x.files || {}), receipt: hasReceipt(x) } })));
     }
     let m = path.match(/^\/review\/(\d+)\/decision$/);
@@ -2541,11 +2544,12 @@ async function loadReviewQueue(mode) {
   list.innerHTML = '';
   let items = [];
   try {
-    const r = await api(mode === 'held' ? '/api/v1/review/items?status=held' : '/api/v1/review/items?status=approved&sampled=1');
+    const r = await api(mode === 'held' ? '/api/v1/review/items?status=held'
+      : mode === 'done' ? '/api/v1/review/items?status=done' : '/api/v1/review/items?status=approved&sampled=1');
     if (r.ok) items = await r.json();
   } catch (e) { showToast('連不上伺服器'); }
   if (!items.length) {
-    list.innerHTML = '<div class="empty-hint">' + (mode === 'held' ? '目前沒有待處理的申報。' : '目前沒有需要抽查的自動核准案件。') + '</div>';
+    list.innerHTML = '<div class="empty-hint">' + (mode === 'held' ? '目前沒有待處理的申報。' : mode === 'done' ? '還沒有已處理的申報。' : '目前沒有需要抽查的自動核准案件。') + '</div>';
     return;
   }
   items.forEach(it => {
@@ -2554,12 +2558,13 @@ async function loadReviewQueue(mode) {
     const files = ['receipt', 'signature', 'voucher'].filter(k => it.files && it.files[k])
       .map(k => `<button class="mini-btn" onclick="viewFile(${Number(it.id)}, '${k}')">${{ receipt: '看收據', signature: '看簽名', voucher: '看憑證' }[k]}</button>`).join('');
     const reasons = (it.review_reasons || []).join('；');
+    const doneTag = mode === 'done' ? `<span class="tag ${it.review_status === 'rejected' ? 'tag-review' : 'tag-ok'}">${it.review_status === 'rejected' ? '已退回' : '已核准'}・${escapeHtml(String(it.reviewed_by || '').startsWith('auto:') ? '自動' : (it.reviewed_by || ''))}</span>` : '';
     const pick = mode === 'held' ? `<input type="checkbox" class="rq-pick" aria-label="勾選這筆" data-id="${Number(it.id)}" data-amount="${Number(it.amount) || 0}">` : '';
     div.innerHTML = `${pick}<div class="entry-body">
       <div class="entry-top"><div class="entry-store">${escapeHtml(it.store || '（未填店家）')}</div><div class="entry-amount">${fmtMoney(Number(it.amount) || 0)}</div></div>
-      <div class="entry-meta"><span class="tag tag-user">${escapeHtml(it.employee || '')}</span><span class="tag tag-cat">${escapeHtml(it.doc_type || '')}</span><span class="tag tag-case">${escapeHtml(it.case_no || '')}</span><span class="tag tag-cat">${escapeHtml(it.category || '')}</span><span class="entry-date">${escapeHtml(it.created_day || '')}</span></div>
+      <div class="entry-meta"><span class="tag tag-user">${escapeHtml(it.employee || '')}</span><span class="tag tag-cat">${escapeHtml(it.doc_type || '')}</span><span class="tag tag-case">${escapeHtml(it.case_no || '')}</span><span class="tag tag-cat">${escapeHtml(it.category || '')}</span><span class="entry-date">${escapeHtml(it.created_day || '')}</span>${doneTag}</div>
       ${reasons ? `<div class="auto-note warn">${escapeHtml(reasons)}</div>` : ''}
-      <div class="entry-actions">${files}<button class="mini-btn" onclick="showHistory(${Number(it.id)})">處理紀錄</button>${mode === 'held' ? `<button class="mini-btn" onclick="decideItem(${Number(it.id)}, 'approve')">核准</button>` : ''}<button class="mini-btn danger" onclick="decideItem(${Number(it.id)}, 'reject')">退回</button></div></div>`;
+      <div class="entry-actions">${files}<button class="mini-btn" onclick="showHistory(${Number(it.id)})">處理紀錄</button>${mode === 'held' ? `<button class="mini-btn" onclick="decideItem(${Number(it.id)}, 'approve')">核准</button>` : ''}${mode !== 'done' ? `<button class="mini-btn danger" onclick="decideItem(${Number(it.id)}, 'reject')">退回</button>` : ''}</div></div>`;
     list.appendChild(div);
   });
 }
@@ -2583,7 +2588,7 @@ async function decideItem(id, decision) {
     else if (r.status === 409) showToast('這筆已決定，無法再變更');
     else showToast('操作失敗（' + r.status + '）');
   } catch (e) { showToast('連不上伺服器'); }
-  loadReviewQueue(document.getElementById('rqSampled').dataset.on === '1' ? 'sampled' : 'held');
+  loadReviewQueue(document.getElementById('rqSampled').dataset.on === '1' ? 'sampled' : 'held');  // 已處理分頁沒有決定按鈕
   refreshReviewCount();
 }
 

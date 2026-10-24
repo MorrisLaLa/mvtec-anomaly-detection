@@ -186,7 +186,8 @@
     }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');
-      return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1')))
+      const match = (x) => st === 'done' ? x.review_status !== 'held' : x.review_status === st;
+      return json(200, state.items.filter((x) => match(x) && (sp === null || !!x.sampled === (sp === '1'))).slice().sort((a, b) => st === 'done' ? b.id - a.id : a.id - b.id)
         .map((x) => ({ ...pub(x), files: { ...(x.files || {}), receipt: hasReceipt(x) } })));
     }
     let m = path.match(/^\/review\/(\d+)\/decision$/);

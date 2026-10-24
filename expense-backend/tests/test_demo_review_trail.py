@@ -40,3 +40,12 @@ def test_demo_export_events(page):
     from tests.test_review_trail import EVENT_HEADERS
     assert text.splitlines()[0].split(",") == EVENT_HEADERS
     assert "人工審核" in text and "林會計" in text and "已核准" in text and "已退回" in text and "缺少單據" in text
+
+
+def test_demo_done_tab(page):
+    open_queue(page)
+    page.click("#rqDone")
+    page.wait_for_selector("#reviewList .entry >> text=中油 二仁溪站")  # 種子資料中已自動核准的那筆
+    row = page.locator("#reviewList .entry", has_text="中油 二仁溪站")
+    assert "已核准・自動" in row.inner_text() and row.locator("button:has-text('退回')").count() == 0
+    assert page.errors == []
