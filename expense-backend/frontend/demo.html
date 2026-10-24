@@ -820,7 +820,7 @@
 </style>
 <div class="demo-bar"><details open><summary>示範版：資料在模擬伺服器，不是真實系統</summary>
   <p>先用「填入金鑰」綁定裝置；「拍照申報」是模擬辨識（統一發票視為 QR 驗證成功，同店同金額再送一次會被判重複退回）。檢視器會略過確認視窗，示範時會自動選「確定」。</p>
-  <div class="row"><b>綁定金鑰</b><button onclick="document.getElementById('bindKey').value='ek_demo_submitter'">申報人（王志明）</button><button onclick="document.getElementById('bindKey').value='ek_demo_reviewer'">主管（陳主管）</button></div>
+  <div class="row"><b>綁定金鑰</b><button onclick="document.getElementById('bindKey').value='ek_demo_submitter'">申報人（王志明）</button><button onclick="document.getElementById('bindKey').value='ek_demo_reviewer'">主管（陳主管）</button><button onclick="document.getElementById('bindKey').value='ek_demo_admin'">管理員</button></div>
   <div class="row"><b>手機網路</b><button data-net="wifi" aria-pressed="true">Wi‑Fi</button><button data-net="cellular" aria-pressed="false">行動網路</button><button data-net="none" aria-pressed="false">無法判斷（iPhone）</button></div>
   <div class="row"><b>伺服器</b><button data-srv="ok" aria-pressed="true">正常</button><button data-srv="offline" aria-pressed="false">離線</button><button data-srv="503" aria-pressed="false">503 錯誤</button><button data-srv="429" aria-pressed="false">429 限流</button></div>
   <div class="row"><b>資料</b><button onclick="__demoReset()">重設示範</button></div>
@@ -842,7 +842,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
       <div class="onboard-title">綁定這支手機</div>
       <div class="onboard-sub">請輸入管理員交給你的裝置金鑰。金鑰只會存在這支手機，用來證明這是公司核准的裝置。</div>
       <div class="field-box"><input type="text" id="bindKey" placeholder="ek_…" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
-      <div class="onboard-sub" style="margin:8px 0 0;">示範金鑰：<span class="mono">ek_demo_submitter</span>（申報人）、<span class="mono">ek_demo_reviewer</span>（主管）。上方示範列有「填入金鑰」按鈕。</div>
+      <div class="onboard-sub" style="margin:8px 0 0;">示範金鑰：<span class="mono">ek_demo_submitter</span>（申報人）、<span class="mono">ek_demo_reviewer</span>（主管）、<span class="mono">ek_demo_admin</span>（管理員）。上方示範列有「填入金鑰」按鈕。</div>
       <div class="pin-error" id="bindError" style="margin-top:10px;"></div>
       <button class="onboard-manual-btn" style="padding:14px; margin-top:4px;" onclick="submitBind()">綁定</button>
     </div>
@@ -1142,7 +1142,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
  * 只用於 demo 頁；正式版 expense-demo.html 不含此檔。資料存在 localStorage，不會送到任何地方。 */
 (function () {
   const realFetch = window.fetch.bind(window);
-  const KEYS = { ek_demo_submitter: { name: '王志明', role: 'submitter' }, ek_demo_reviewer: { name: '陳主管', role: 'reviewer' } };
+  const KEYS = { ek_demo_submitter: '王志明', ek_demo_reviewer: '陳主管', ek_demo_admin: '管理員' };  // 金鑰 → 裝置名稱；角色看 state.devices
   const STORE = 'demo_server_v1';
   const sim = { offline: false, force: 'ok', latency: 350 };   // force: ok | 503 | 429
   window.__demoSim = sim;
@@ -1161,6 +1161,9 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
       seed(2, '張家豪', '阿明小吃部', 180, '收據', 'held', ['沒有可自動驗證的電子發票 QR，需人工審核'], false),
       seed(3, '陳建宏', '中油 二仁溪站', 980, '統一發票', 'approved', [], true)] };
   }
+  if (!state.devices) state.devices = [
+    { id: 1, name: '王志明', role: 'submitter' }, { id: 2, name: '陳主管', role: 'reviewer' }, { id: 3, name: '管理員', role: 'admin' }];
+  const admins = () => state.devices.filter((d) => d.role === 'admin').length;
   const blobs = {};  // id -> {signature, voucher}（不持久化）
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* 略過 */ } };
   const json = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -1188,8 +1191,9 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
     await sleep(sim.latency);
     if (sim.offline) throw new TypeError('Failed to fetch');
     const auth = ((opts.headers || {}).Authorization || '').replace(/^Bearer /, '');
-    const user = KEYS[auth];
-    if (!user) return json(401, { detail: 'unauthorized' });
+    const dev = state.devices.find((d) => d.name === KEYS[auth]);
+    if (!dev) return json(401, { detail: 'unauthorized' });
+    const user = { name: dev.name, role: dev.role };
     if (path === '/rules') return json(200, []);
     if (path === '/me') return json(200, { ...user, expires_in_days: 340 });
     if (path === '/submit' && method === 'POST') {
@@ -1211,6 +1215,27 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
       return json(200, { ok: true, duplicate: false, ...pub(it), needs_review: d.status === 'held' });
     }
     if (user.role === 'submitter') return json(403, { detail: 'forbidden' });
+    if (path.startsWith('/admin/')) {  // 與正式版相同的規則：管理員 1–2 位、手機上不能拿掉另一位管理員
+      if (user.role !== 'admin') return json(403, { detail: 'forbidden' });
+      const body = opts.body ? JSON.parse(opts.body) : {};
+      const target = state.devices.find((d) => d.id === body.device_id);
+      if (path === '/admin/unblock') return json(200, { ok: true, cleared: 0 });
+      if (path === '/admin/devices') return json(200, state.devices.map((d) => ({ ...d, status: '有效', is_me: d.id === dev.id })));
+      if (!target) return json(404, { detail: '找不到這台裝置' });
+      if (path === '/admin/role') {
+        if (target.role === 'admin' && target.id !== dev.id && body.role !== 'admin')
+          return json(403, { detail: '手機上不能拿掉另一位管理員，請在主機上執行 python -m app.admin set-role' });
+        if (body.role === 'admin' && target.role !== 'admin' && admins() >= 2) return json(409, { detail: '管理員最多 2 位，請先把其中一位降級或改用轉移' });
+        if (target.role === 'admin' && body.role !== 'admin' && admins() <= 1) return json(409, { detail: '管理員至少要保留 1 位，請先增加另一位管理員或改用轉移' });
+        target.role = body.role; save();
+        return json(200, { ok: true });
+      }
+      if (path === '/admin/transfer') {
+        if (target.id === dev.id || target.role === 'admin') return json(409, { detail: '對方已經是管理員' });
+        target.role = 'admin'; dev.role = 'reviewer'; save();
+        return json(200, { ok: true });
+      }
+    }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');
       return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1'))).map(pub));
