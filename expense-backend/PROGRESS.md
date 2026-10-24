@@ -480,3 +480,9 @@
 - 我在綠燈後改過自己新測試的一個斷言：加上檢查「也能申報」的提示文字，是加嚴，不是放寬。
 - 限制：名稱完全不像時不會警告。
 - 視窗 8 狀態：S1 使用者接受風險；S2、S3 已修；D1–D3（部署）移到視窗 9。視窗 8 勾選完成。
+
+# Pillow 升級（台北 2026-10-24，依使用者指示「升級」）
+- 起因：CI `security`（pip-audit）連續失敗，`Pillow==12.3.0` 有 8 個已知漏洞，修正版 13.0.0。
+- 做了什麼：`requirements-prod.txt` 改為 `Pillow==13.0.0`（`requirements.txt` 本來未釘版）。
+- 驗證：升級前後完整全套皆 412／412 通過（含圖片上傳 M2 測試）；本機 `pip-audit -r requirements-prod.txt` 結果為「No known vulnerabilities found」。
+- 限制：未對照 Pillow 13 的變更說明；未用真實手機照片（HEIC、大圖）驗證；CI 結果待推送後確認。
