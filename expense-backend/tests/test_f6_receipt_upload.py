@@ -77,7 +77,7 @@ def test_photo_without_qr_goes_to_human_review(server, page):
     page.click("#screen-review button:has-text('更多選項')")
     page.click("#docTypeChips .chip:text-is('收據')")
     finish(page, amount=180)
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=審核中")
     r = row(server)[0]
     assert r[1] == 180 and r[2] is None and r[4] == "ocr" and r[6] == "held" and r[8] == "收據"
 

@@ -74,7 +74,7 @@ def test_review_screen_escapes_malicious_store_name(server, page):
 def test_my_rejected_submission_shows_reason(server, page):
     login(page, server)
     submit_no_receipt(page, amount="1500")  # 無單據 >1000 → 轉人工
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=審核中")
     rk = server.new_device("陳主管", "reviewer")
     import sqlite3
     cid = server.query("SELECT id FROM expenses")[0][0]

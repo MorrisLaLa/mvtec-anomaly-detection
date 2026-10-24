@@ -3,7 +3,7 @@ from tests.test_demo_page import bind, built, page  # noqa: F401
 
 
 def test_demo_reviewer_exports_csv(page):
-    bind(page, "主管（")
+    bind(page, "審核人員（")
     page.wait_for_selector("#reviewBar", state="visible")
     page.click("#reviewBar button")
     page.wait_for_selector("#screen-reviewq", state="visible")
@@ -24,7 +24,7 @@ def test_demo_uses_artifact_downloads_when_available(page):
     """在 Artifact 檢視器裡一般下載無效：有 claude.use('downloads') 時必須改用它。"""
     page.evaluate("""() => { window.__saved = null; window.claude = { use: async (n) => n === 'downloads' ? {
         save: async (req) => { window.__saved = { filename: req.filename, text: await req.data.text(), bom: new Uint8Array(await req.data.arrayBuffer())[0] }; return { status: 'saved' }; } } : null }; }""")
-    bind(page, "主管（")
+    bind(page, "審核人員（")
     page.wait_for_selector("#reviewBar", state="visible")
     page.click("#reviewBar button")
     page.wait_for_selector("#screen-reviewq", state="visible")
@@ -38,7 +38,7 @@ def test_demo_uses_artifact_downloads_when_available(page):
 
 def test_demo_declined_download_says_cancelled(page):
     page.evaluate("""() => { window.claude = { use: async () => ({ save: async () => { throw { code: 'declined', message: 'no' }; } }) }; }""")
-    bind(page, "主管（")
+    bind(page, "審核人員（")
     page.wait_for_selector("#reviewBar", state="visible")
     page.click("#reviewBar button")
     page.wait_for_selector("#screen-reviewq", state="visible")

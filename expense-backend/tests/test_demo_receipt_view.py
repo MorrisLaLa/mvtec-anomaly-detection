@@ -3,7 +3,7 @@ from tests.test_demo_page import bind, built, page  # noqa: F401
 
 
 def open_queue(page):
-    bind(page, "主管（")
+    bind(page, "審核人員（")
     page.wait_for_selector("#reviewBar", state="visible")
     page.click("#reviewBar button")
     page.wait_for_selector("#reviewList .entry")

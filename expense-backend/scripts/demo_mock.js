@@ -2,7 +2,7 @@
  * 只用於 demo 頁；正式版 expense-demo.html 不含此檔。資料存在 localStorage，不會送到任何地方。 */
 (function () {
   const realFetch = window.fetch.bind(window);
-  const KEYS = { ek_demo_submitter: '王志明', ek_demo_reviewer: '陳主管', ek_demo_admin: '管理員' };  // 金鑰 → 裝置名稱；角色看 state.devices
+  const KEYS = { ek_demo_submitter: '王志明', ek_demo_reviewer: '林會計', ek_demo_admin: '管理員' };  // 金鑰 → 裝置名稱；角色看 state.devices
   const STORE = 'demo_server_v1';
   const sim = { offline: false, force: 'ok', latency: 350 };   // force: ok | 503 | 429
   window.__demoSim = sim;
@@ -22,7 +22,7 @@
       seed(3, '陳建宏', '中油 二仁溪站', 980, '統一發票', 'approved', [], true)] };
   }
   if (!state.devices) state.devices = [
-    { id: 1, name: '王志明', role: 'submitter' }, { id: 2, name: '陳主管', role: 'reviewer' }, { id: 3, name: '管理員', role: 'admin' }];
+    { id: 1, name: '王志明', role: 'submitter' }, { id: 2, name: '林會計', role: 'reviewer' }, { id: 3, name: '管理員', role: 'admin' }];
   const admins = () => state.devices.filter((d) => d.role === 'admin').length;
   const blobs = {};  // id -> {signature, voucher}（不持久化）
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* 略過 */ } };
@@ -31,6 +31,15 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const hasReceipt = (x) => !!x.doc_type && x.doc_type !== '無單據';
+  // 處理紀錄（與正式版相同的中文動作與狀態）
+  const ST = { approved: '已核准', held: '待審核', rejected: '已退回' };
+  const nowTaipei = () => new Date(Date.now() + 8 * 3600e3).toISOString().replace('T', ' ').slice(0, 19);
+  const events = (x) => {  // 舊的示範資料沒有紀錄：依目前狀態補一筆自動判斷
+    if (!x.events) x.events = [{ time: (x.created_day || '') + ' 09:00:00', action: x.review_status === 'held' ? '轉人工審核' : '自動審核',
+      actor: '自動（v1）', from: '', to: x.review_status === 'held' ? 'held' : x.reviewed_by === 'auto:v1' ? 'approved' : 'held', comment: '' }];
+    return x.events;
+  };
+  const addEvent = (x, action, actor, from, to, comment) => events(x).push({ time: nowTaipei(), action, actor, from, to, comment: comment || '' });
   // 示範沒有真的照片：依申報內容畫一張標明「示範」的發票圖，讓主管能試「看收據」
   function demoReceipt(it) {
     const cv = document.createElement('canvas'); cv.width = 480; cv.height = 640;
@@ -87,6 +96,7 @@
       Object.assign(it, { review_status: d.status, review_reasons: d.reasons, reviewed_by: d.status === 'held' ? null : 'auto:v1',
         sampled: d.status === 'approved' && it.id % 5 === 0 });
       blobs[it.id] = { signature: fd.get('signature'), voucher: fd.get('voucher') };
+      it.events = [{ time: nowTaipei(), action: d.status === 'held' ? '轉人工審核' : '自動審核', actor: '自動（v1）', from: '', to: d.status, comment: d.reasons.join('；') }];
       state.items.push(it); save();
       return json(200, { ok: true, duplicate: false, ...pub(it), needs_review: d.status === 'held' });
     }
@@ -138,6 +148,42 @@
         .map((x) => cols.map((c) => cell(val(c, c === 'needs_review' ? x.review_status === 'held' : x[c]))).join(','));
       return new Response([head.join(','), ...rows].join('\r\n') + '\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8' } });
     }
+    if (path === '/review/bulk-approve' && method === 'POST') {
+      const approved = [], skipped = [];
+      for (const id of JSON.parse(opts.body).ids || []) {
+        const it = state.items.find((x) => x.id === id);
+        const reason = !it ? '找不到' : it.employee === user.name ? '自己的申報' : it.review_status !== 'held' ? '已決定' : null;
+        if (reason) { skipped.push({ id, reason }); continue; }
+        addEvent(it, '人工審核', user.name, 'held', 'approved', '批次核准');
+        Object.assign(it, { review_status: 'approved', reviewed_by: user.name, review_comment: '批次核准' });
+        approved.push(id);
+      }
+      save();
+      return json(200, { approved, skipped });
+    }
+    let hm = path.match(/^\/review\/(\d+)\/history$/);
+    if (hm) {
+      const it = state.items.find((x) => x.id === +hm[1]);
+      if (!it) return json(404, { detail: '找不到這筆申報' });
+      const steps = [{ time: (events(it)[0] || {}).time || '', action: '送出申報', actor: it.employee, from_status: null, to_status: null, comment: null },
+        ...events(it).map((e) => ({ time: e.time, action: e.action, actor: e.actor, from_status: ST[e.from] || null, to_status: ST[e.to] || null,
+          comment: e.comment || null, self_review: false }))];
+      return json(200, { id: it.id, store: it.store, amount: it.amount, employee: it.employee, steps });
+    }
+    if (path === '/export/events') {
+      const head = ['時間', '申報編號', '申報識別碼', '申報人', '店家', '金額', '動作', '執行者', '原狀態', '新狀態', '意見', '規則版本', '自審'];
+      const f = query.get('from') || '', t = query.get('to') || '';
+      const cell = (v) => { let s = v === undefined || v === null ? '' : String(v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+      const rows = [];
+      state.items.forEach((x) => events(x).forEach((e) => {
+        if ((f && e.time.slice(0, 10) < f) || (t && e.time.slice(0, 10) > t)) return;
+        rows.push([e.time, x.id, x.client_id, x.employee, x.store, x.amount, e.action, e.actor, ST[e.from] || '', ST[e.to] || '', e.comment,
+          e.actor.startsWith('自動') ? 'v1' : '', '否'].map(cell).join(','));
+      }));
+      rows.sort();
+      return new Response([head.join(','), ...rows].join('\r\n') + '\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8' } });
+    }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');
       return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1')))
@@ -152,6 +198,7 @@
       if (it.review_status === target) return json(200, { ok: true, unchanged: true });
       if (!(it.review_status === 'held' || (it.review_status === 'approved' && it.sampled && target === 'rejected'))) return json(409, { detail: '這筆已決定，無法再變更' });
       if (it.employee === user.name) return json(403, { detail: '不可審核自己的申報' });
+      addEvent(it, '人工審核', user.name, it.review_status, target, body.comment);
       Object.assign(it, { review_status: target, reviewed_by: user.name, review_comment: body.comment || null,
         review_reasons: target === 'rejected' ? [body.comment] : it.review_reasons });
       save();

@@ -51,7 +51,7 @@ def test_submitter_flow_auto_approve_held_and_wifi_simulation(page):
     submit_no_receipt(page, 300, "便當店")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     submit_no_receipt(page, 1500, "零星採買")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=審核中")
     page.click("button[data-net='cellular']")  # 切到行動網路
     submit_no_receipt(page, 120, "飲料店")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=等 Wi")
@@ -93,7 +93,7 @@ def test_429_and_duplicate_rejection_show_reasons(page):
 
 
 def test_reviewer_sees_seeded_queue_and_can_approve_and_reject(page):
-    bind(page, "主管")
+    bind(page, "審核人員")
     page.wait_for_selector("#screen-home", state="visible")
     page.wait_for_selector("#reviewBar", state="visible")
     page.click("#reviewBar button")

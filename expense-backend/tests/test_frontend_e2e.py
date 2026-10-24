@@ -259,7 +259,7 @@ def test_category_correction_is_reported_to_backend(server, page):
 def test_no_receipt_over_1000_marked_for_manager_review(server, page):
     login(page, server)
     submit_no_receipt(page, amount="1500")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=審核中")
     assert server.query("SELECT needs_review FROM expenses") == [(1,)]
 
 

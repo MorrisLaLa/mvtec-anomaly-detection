@@ -55,7 +55,7 @@ def test_result_card_is_readable(server, page):
     page.click("#homeActionBar button:has-text('沒有收據')")
     page.fill("#fieldAmount", "1500")
     page.click(".btn-submit")
-    page.wait_for_selector("#screen-result :text('主管確認中')")
+    page.wait_for_selector("#screen-result :text('審核中')")
     measure(page, "結果卡")
 
 

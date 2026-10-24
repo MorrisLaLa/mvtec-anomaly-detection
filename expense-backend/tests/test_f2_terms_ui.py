@@ -29,7 +29,7 @@ def test_home_uses_site_wording_for_every_status(server, page):
     submit_no_receipt(page, amount="120")
     page.wait_for_selector("#entryList .entry >> nth=0 >> text=已送出")
     submit_no_receipt(page, amount="1500")
-    page.wait_for_selector("#entryList .entry >> nth=0 >> text=主管確認中")
+    page.wait_for_selector("#entryList .entry >> nth=0 >> text=審核中")
     page.evaluate("""() => { entries.unshift(
       {clientId: 'x1', store: '甲店', amount: 50, category: '五金材料', case: CASES[0], date: todayStr(), type: '收據',
        status: 'rejected', reviewReasons: ['重複報銷：這張發票已經有申報']},

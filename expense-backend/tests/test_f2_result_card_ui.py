@@ -39,7 +39,7 @@ def test_waiting_wifi_card_has_cellular_button(server, page):
     assert server.query("SELECT COUNT(*) FROM expenses")[0][0] == 0
     page.once("dialog", lambda d: d.accept())
     page.click(f"{CARD} button:has-text('現在用行動網路送出')")
-    page.wait_for_function("document.querySelector('#screen-result').innerText.includes('已送出') || document.querySelector('#screen-result').innerText.includes('主管確認中')", timeout=20000)
+    page.wait_for_function("document.querySelector('#screen-result').innerText.includes('已送出') || document.querySelector('#screen-result').innerText.includes('審核中')", timeout=20000)
     assert server.query("SELECT COUNT(*) FROM expenses")[0][0] == 1
 
 
@@ -48,14 +48,14 @@ def test_held_card_says_nothing_more_to_do(server, page):
     page.click("#homeActionBar button:has-text('沒有收據')")
     page.fill("#fieldAmount", "1500")
     page.click(".btn-submit")
-    page.wait_for_selector(f"{CARD} :text('主管確認中，通過後不用再做什麼')")
+    page.wait_for_selector(f"{CARD} :text('審核人員確認中，通過後不用再做什麼')")
 
 
 def test_rejected_card_shows_reason_and_retake(server, page):
     login(page, server)
     data = invoice(total=210, no="ZX12345678")
     submit_photo(page, data, store="店")
-    page.wait_for_function("/已送出|主管確認中/.test(document.querySelector('#screen-result').innerText)")
+    page.wait_for_function("/已送出|審核中/.test(document.querySelector('#screen-result').innerText)")
     page.click(f"{CARD} button:has-text('完成')")
     pick(page, data)           # 同一張發票再送一次
     page.click(".btn-submit")

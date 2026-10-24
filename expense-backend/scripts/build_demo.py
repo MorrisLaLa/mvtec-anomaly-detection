@@ -32,7 +32,7 @@ bar_css = """
   .demo-bar p { margin: 6px 0 0; color: var(--ink-soft); }"""
 bar = """<div class="demo-bar"><details open><summary>示範版：資料在模擬伺服器，不是真實系統</summary>
   <p>先用「填入金鑰」綁定裝置；「拍照申報」是模擬辨識（統一發票視為 QR 驗證成功，同店同金額再送一次會被判重複退回）。檢視器會略過確認視窗，示範時會自動選「確定」。</p>
-  <div class="row"><b>綁定金鑰</b><button onclick="document.getElementById('bindKey').value='ek_demo_submitter'">申報人（王志明）</button><button onclick="document.getElementById('bindKey').value='ek_demo_reviewer'">主管（陳主管）</button><button onclick="document.getElementById('bindKey').value='ek_demo_admin'">管理員</button></div>
+  <div class="row"><b>綁定金鑰</b><button onclick="document.getElementById('bindKey').value='ek_demo_submitter'">申報人（王志明）</button><button onclick="document.getElementById('bindKey').value='ek_demo_reviewer'">審核人員（林會計）</button><button onclick="document.getElementById('bindKey').value='ek_demo_admin'">管理員</button></div>
   <div class="row"><b>手機網路</b><button data-net="wifi" aria-pressed="true">Wi‑Fi</button><button data-net="cellular" aria-pressed="false">行動網路</button><button data-net="none" aria-pressed="false">無法判斷（iPhone）</button></div>
   <div class="row"><b>伺服器</b><button data-srv="ok" aria-pressed="true">正常</button><button data-srv="offline" aria-pressed="false">離線</button><button data-srv="503" aria-pressed="false">503 錯誤</button><button data-srv="429" aria-pressed="false">429 限流</button></div>
   <div class="row"><b>資料</b><button onclick="__demoReset()">重設示範</button></div>
@@ -46,7 +46,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
 </script>
 """
 # 5) 綁定畫面加示範金鑰提示
-body = body.replace('<div class="pin-error" id="bindError"', '<div class="onboard-sub" style="margin:8px 0 0;">示範金鑰：<span class="mono">ek_demo_submitter</span>（申報人）、<span class="mono">ek_demo_reviewer</span>（主管）、<span class="mono">ek_demo_admin</span>（管理員）。上方示範列有「填入金鑰」按鈕。</div>\n      <div class="pin-error" id="bindError"', 1)
+body = body.replace('<div class="pin-error" id="bindError"', '<div class="onboard-sub" style="margin:8px 0 0;">示範金鑰：<span class="mono">ek_demo_submitter</span>（申報人）、<span class="mono">ek_demo_reviewer</span>（審核人員）、<span class="mono">ek_demo_admin</span>（管理員）。上方示範列有「填入金鑰」按鈕。</div>\n      <div class="pin-error" id="bindError"', 1)
 # 6) 內嵌 sync.js 與模擬伺服器（模擬伺服器必須先於 sync.js）
 body = body.replace('<script src="sync.js"></script>', "<script>\n" + mock + "\n</script>\n<script>\n" + sync + "\n</script>", 1)
 

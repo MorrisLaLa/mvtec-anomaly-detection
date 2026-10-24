@@ -6,12 +6,12 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Path as PathParam, Query, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import admin as admin_ops
 from .. import review as engine
 from ..auth import ROLES, any_device, require_role, reviewer_only
-from .expenses import get_db
+from .expenses import _EXPORT_VALUES, get_db
 
 router = APIRouter()
 ExpenseId = PathParam(ge=1, le=2**63 - 1)  # 超出 SQLite INTEGER 範圍會變成 500
@@ -83,6 +83,97 @@ def decide(body: Decision, request: Request, expense_id: int = ExpenseId, device
                      to_status=target, comment=comment or None, self_review=self_review, now=now)
     db.commit()
     return {"ok": True, "unchanged": False, "review_status": target, "self_review": self_review}
+
+
+# ---------- 使用者 2026-10-24：勾選後一鍵核准、處理紀錄、匯出處理紀錄 ----------
+class BulkApprove(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=200)
+    comment: str = ""
+
+
+@router.post("/review/bulk-approve")
+def bulk_approve(body: BulkApprove, request: Request, device=reviewer_only, db=Depends(get_db)):
+    """只核准「待審核」的；自己的申報一律略過（任何角色，包括管理員）；每筆各自寫入審核事件。"""
+    now = request.app.state.clock()
+    comment = (body.comment or "").strip()[:500] or "批次核准"
+    approved, skipped = [], []
+    for eid in dict.fromkeys(body.ids):  # 去重、保留順序
+        row = db.execute("SELECT * FROM expenses WHERE id = ?", (eid,)).fetchone()
+        reason = ("找不到" if not row else "自己的申報" if row["employee"] == device["name"]
+                  else "已決定" if row["review_status"] != "held" else None)
+        if reason:
+            skipped.append({"id": eid, "reason": reason})
+            continue
+        db.execute("UPDATE expenses SET review_status='approved', reviewed_by=?, reviewed_at=?, review_comment=? WHERE id=?",
+                   (device["name"], now.strftime("%Y-%m-%dT%H:%M:%SZ"), comment, eid))
+        engine.add_event(db, eid, "decision", device["name"], actor_device_id=device["id"], from_status="held",
+                         to_status="approved", comment=comment, now=now)
+        approved.append(eid)
+    db.commit()
+    request.app.state.access_log.event("bulk_approve", now, device_id=device["id"], approved=len(approved), skipped=len(skipped))
+    return {"approved": approved, "skipped": skipped}
+
+
+_ACTIONS = {"auto_decision": "自動審核", "held": "轉人工審核", "decision": "人工審核"}
+_STATUS = _EXPORT_VALUES["review_status"]
+
+
+def _taipei(ts):
+    """資料庫的 UTC 時間（'…Z' 或 SQLite datetime('now')）轉成台北時間 YYYY-MM-DD HH:MM:SS。"""
+    from datetime import datetime, timedelta
+    if not ts:
+        return ""
+    dt = datetime.strptime(ts.rstrip("Z").replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    return (dt + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _actor(a):
+    return f"自動（{a[5:]}）" if a and a.startswith("auto:") else a
+
+
+@router.get("/review/{expense_id}/history")
+def history(expense_id: int = ExpenseId, device=reviewer_only, db=Depends(get_db)):
+    row = db.execute("SELECT * FROM expenses WHERE id = ?", (expense_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "找不到這筆申報")
+    steps = [{"time": _taipei(row["created_at"]), "action": "送出申報", "actor": row["employee"], "from_status": None,
+              "to_status": None, "comment": None, "self_review": False}]
+    for e in db.execute("SELECT * FROM review_events WHERE expense_id = ? ORDER BY id", (expense_id,)):
+        steps.append({"time": _taipei(e["created_at"]), "action": _ACTIONS.get(e["event"], e["event"]), "actor": _actor(e["actor"]),
+                      "from_status": _STATUS.get(e["from_status"], e["from_status"]),
+                      "to_status": _STATUS.get(e["to_status"], e["to_status"]), "comment": e["comment"],
+                      "self_review": bool(e["self_review"])})
+    return {"id": row["id"], "client_id": row["client_id"], "employee": row["employee"], "store": row["store"],
+            "amount": row["amount"], "steps": steps}
+
+
+EVENT_COLUMNS = ["時間", "申報編號", "申報識別碼", "申報人", "店家", "金額", "動作", "執行者", "原狀態", "新狀態", "意見",
+                 "規則版本", "自審"]
+
+
+@router.get("/export/events")
+def export_events(request: Request, from_: str = Query("", alias="from"), to: str = "", device=reviewer_only, db=Depends(get_db)):
+    """每一個審核動作一列（依動作發生的台北日期篩選），給會計追蹤發票的處理流向。"""
+    import csv
+    import io
+    from fastapi.responses import Response
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(EVENT_COLUMNS)
+    n = 0
+    for e in db.execute("""SELECT ev.*, x.client_id, x.employee, x.store, x.amount FROM review_events ev
+                           JOIN expenses x ON x.id = ev.expense_id ORDER BY ev.id"""):
+        t = _taipei(e["created_at"])
+        if (from_ and t[:10] < from_) or (to and t[:10] > to):
+            continue
+        vals = [t, e["expense_id"], e["client_id"], e["employee"], e["store"], e["amount"], _ACTIONS.get(e["event"], e["event"]),
+                _actor(e["actor"]), _STATUS.get(e["from_status"], e["from_status"] or ""),
+                _STATUS.get(e["to_status"], e["to_status"] or ""), e["comment"], e["rule_version"], "是" if e["self_review"] else "否"]
+        w.writerow([("'" + v if isinstance(v, str) and v and v[0] in "=+-@\t\r" else v) for v in vals])
+        n += 1
+    st = request.app.state
+    st.access_log.event("export_events", st.clock(), device_id=device["id"], rows=n, filters=bool(from_ or to))
+    return Response(buf.getvalue(), media_type="text/csv; charset=utf-8")
 
 
 @router.get("/files/{expense_id}/{kind}")

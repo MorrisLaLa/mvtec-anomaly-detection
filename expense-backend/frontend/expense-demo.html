@@ -809,6 +809,9 @@
   .mini-btn { border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 9px; font-size:11px; font-weight:600; cursor:pointer; }
   .mini-btn.danger { color:var(--alert); border-color:var(--alert); }
   .export-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 18px; border-top:1px solid var(--line); color:var(--ink-soft); }
+  .rq-pick { -webkit-appearance:checkbox; appearance:auto; width:24px; height:24px; margin:0 4px 0 0; flex:none; }
+  .history-step { padding:8px 0; border-bottom:1px solid var(--line); font-size:16px; line-height:1.5; }
+  .history-step small { display:block; color:var(--ink-soft); }
   .export-row input { border:1.5px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); padding:6px 8px; min-height:44px; font-size:16px; }
 
   ::selection { background: var(--hazard); color: var(--hazard-ink); }
@@ -931,7 +934,7 @@
         <span class="net-strip-hint">（點一下立即同步）</span>
       </div>
       <div class="wifi-row" id="reviewBar" style="display:none; justify-content:space-between;">
-        <span id="reviewBarText">主管審核</span>
+        <span id="reviewBarText">審核</span>
         <button class="mini-btn" onclick="openReviewQueue()">開啟審核清單</button>
       </div>
       <label class="wifi-row"><input type="checkbox" id="wifiOnly" onchange="onWifiToggle()"> 僅 Wi‑Fi 自動上傳（省行動網路流量）</label>
@@ -961,7 +964,7 @@
     </button>
   </div>
 
-  <!-- ===== 主管審核清單（reviewer／admin） ===== -->
+  <!-- ===== 審核清單（reviewer／admin） ===== -->
   <div id="screen-reviewq" class="screen" style="display:none;">
     <div class="back-row">
       <div class="back-btn" onclick="goHome()">
@@ -979,6 +982,11 @@
       <span>至</span>
       <input type="date" id="exportTo" aria-label="匯出結束日期">
       <button class="mini-btn" id="exportBtn" onclick="exportCsv()">匯出 CSV（給會計）</button>
+      <button class="mini-btn" id="exportEventsBtn" onclick="exportCsv('events')">匯出處理紀錄</button>
+    </div>
+    <div class="export-row" id="bulkRow">
+      <button class="mini-btn" id="rqSelectAll" onclick="selectAllPicks()">全選</button>
+      <button class="mini-btn" id="bulkApproveBtn" onclick="bulkApprove()">核准勾選的申報</button>
     </div>
     <div class="entry-list" id="reviewList"></div>
   </div>
@@ -1131,6 +1139,15 @@
   <div id="caseOptions"></div>
 </div>
 
+<!-- 處理紀錄 -->
+<div class="sheet-backdrop" id="historyBackdrop" onclick="closeHistory()"></div>
+<div class="sheet" id="historySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="historyTitle">處理紀錄</div>
+  <div id="historySteps" style="max-height:60vh; overflow-y:auto;"></div>
+  <button class="btn btn-secondary" style="width:100%; margin-top:12px; min-height:48px;" onclick="closeHistory()">關閉</button>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
@@ -1230,7 +1247,7 @@ function openSettings() {
   if (myRole === 'admin') loadAdminDevices();
   showScreen('screen-settings');
 }
-const ROLE_LABEL = { submitter: '申報人', reviewer: '主管', admin: '管理員' };
+const ROLE_LABEL = { submitter: '申報人', reviewer: '審核人員', admin: '管理員' };
 async function loadAdminDevices() {
   const box = document.getElementById('adminDevices');
   let rows = [];
@@ -1249,7 +1266,7 @@ async function loadAdminDevices() {
     const btn = (text, fn) => { const b = document.createElement('button'); b.className = 'mini-btn'; b.textContent = text; b.onclick = fn; div.appendChild(b); };
     if (d.role !== 'admin') {
       btn('設為管理員', () => setDeviceRole(d.id, 'admin'));
-      btn(d.role === 'reviewer' ? '改為申報人' : '改為主管', () => setDeviceRole(d.id, d.role === 'reviewer' ? 'submitter' : 'reviewer'));
+      btn(d.role === 'reviewer' ? '改為申報人' : '改為審核人員', () => setDeviceRole(d.id, d.role === 'reviewer' ? 'submitter' : 'reviewer'));
       btn('轉移給他', () => transferAdmin(d.id, d.name));
     } else if (d.is_me) {
       btn('我不當管理員了', () => setDeviceRole(d.id, 'reviewer', true));
@@ -1282,7 +1299,7 @@ async function setDeviceRole(id, role, self = false) {
   } catch (e) { showToast('連不上伺服器'); }
 }
 async function transferAdmin(id, name) {
-  if (!window.confirm(`確定把你的管理員權限轉給「${name}」？轉移後你會變成主管。`)) return;
+  if (!window.confirm(`確定把你的管理員權限轉給「${name}」？轉移後你會變成審核人員。`)) return;
   try {
     if (!await adminPost('/api/v1/admin/transfer', { device_id: id })) return;
     showToast('已轉移管理員權限');
@@ -1454,7 +1471,7 @@ function renderHome() {
       ? `<span class="tag tag-review">這張被退回：${escapeHtml(friendlyReasons(e.reviewReasons))}</span>`
       : e.status === 'pending-sync'
       ? '<span class="tag tag-pending">等待送出</span>'
-      : (e.status === 'review' ? '<span class="tag tag-review">主管確認中</span>' : '<span class="tag tag-ok">已送出</span>');
+      : (e.status === 'review' ? '<span class="tag tag-review">審核中</span>' : '<span class="tag tag-ok">已送出</span>');
     const actions = e.status === 'failed'
       ? `<div class="entry-actions">${e.failStatus === 401 ? `<button class="mini-btn" onclick="rebindDevice(event)">重新綁定</button>` : ''}<button class="mini-btn" onclick="resendEntry('${e.clientId}', event)">重送</button><button class="mini-btn danger" onclick="deleteFailedEntry('${e.clientId}', event)">刪除</button></div>`
       : e.status === 'waiting-wifi'
@@ -1588,7 +1605,7 @@ function renderDocTypeChips() {
     row.appendChild(chip);
   });
   document.getElementById('docTypeNote').textContent = selectedDocType === '統一發票'
-    ? '有電子發票 QR 時，系統會自動核對並可能自動核准。' : '收據沒有可驗證的 QR，會交由主管審核。';
+    ? '有電子發票 QR 時，系統會自動核對並可能自動核准。' : '收據沒有可驗證的 QR，會交由審核人員確認。';
 }
 
 let selectedCategory = '';
@@ -1646,7 +1663,7 @@ function checkThreshold() {
   const banner = document.getElementById('thresholdBanner');
   const amt = parseInt(document.getElementById('fieldAmount').value || '0', 10);
   if (currentReceipt && currentReceipt.isNoReceipt && amt > 1000) {
-    banner.textContent = `沒有收據的金額超過 NT$1,000，此筆會由主管確認`;
+    banner.textContent = `沒有收據的金額超過 NT$1,000，此筆會由審核人員確認`;
     banner.classList.add('show');
   } else {
     banner.classList.remove('show');
@@ -1911,7 +1928,7 @@ function renderResult() {
   const done = '<button class="btn btn-secondary" onclick="closeResult()">完成</button>';
   let title, sub = '', actions = done;
   if (e.status === 'ok') { title = '✓ 已送出'; }
-  else if (e.status === 'review') { title = '主管確認中'; sub = '主管確認中，通過後不用再做什麼'; }
+  else if (e.status === 'review') { title = '審核中'; sub = '審核人員確認中，通過後不用再做什麼'; }
   else if (e.status === 'rejected') {
     title = '這張被退回：' + friendlyReasons(e.reviewReasons);
     actions = '<button class="btn btn-primary" onclick="recaptureFromResult()">重新拍一張</button>' + done;
@@ -1958,7 +1975,7 @@ function onWifiToggle() {
   if (ExpenseSync.autoAllowed()) runSync();
 }
 
-// ---------------- 主管審核（reviewer／admin） ----------------
+// ---------------- 審核（reviewer／admin） ----------------
 let myRole = null;
 const isReviewer = () => myRole === 'reviewer' || myRole === 'admin';
 function api(path, opts = {}) {
@@ -1985,7 +2002,7 @@ async function refreshReviewCount() {
   if (!isReviewer() || !ExpenseSync.autoAllowed()) return;
   try {
     const r = await api('/api/v1/review/items?status=held');
-    if (r.ok) document.getElementById('reviewBarText').textContent = `主管審核：${(await r.json()).length} 筆待處理`;
+    if (r.ok) document.getElementById('reviewBarText').textContent = `審核：${(await r.json()).length} 筆待處理`;
   } catch (e) { /* 離線 */ }
 }
 function openReviewQueue() {
@@ -2002,25 +2019,74 @@ async function saveFile(filename, blob) {  // 存檔；其他打包版本可改�
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   return true;
 }
-async function exportCsv() {
+function selectAllPicks() {
+  const boxes = [...document.querySelectorAll('.rq-pick')];
+  const on = boxes.some(b => !b.checked);
+  boxes.forEach(b => { b.checked = on; });
+}
+async function bulkApprove() {
+  const picked = [...document.querySelectorAll('.rq-pick:checked')];
+  if (!picked.length) { showToast('請先勾選要核准的申報'); return; }
+  const total = picked.reduce((s, b) => s + Number(b.dataset.amount || 0), 0);
+  if (!window.confirm(`確定核准勾選的 ${picked.length} 筆，共 ${fmtMoney(total)}？自己的申報會自動略過。`)) return;
+  try {
+    const r = await api('/api/v1/review/bulk-approve', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: picked.map(b => Number(b.dataset.id)) }) });
+    if (!r.ok) { showToast('核准失敗（' + r.status + '）'); return; }
+    const j = await r.json();
+    showToast(`已核准 ${j.approved.length} 筆` + (j.skipped.length ? `，略過 ${j.skipped.length} 筆（${[...new Set(j.skipped.map(s => s.reason))].join('、')}）` : ''));
+  } catch (e) { showToast('連不上伺服器'); }
+  loadReviewQueue('held');
+  refreshReviewCount();
+}
+async function showHistory(id) {
+  const box = document.getElementById('historySteps');
+  box.textContent = '讀取中…';
+  document.getElementById('historyBackdrop').classList.add('show');
+  document.getElementById('historySheet').classList.add('show');
+  try {
+    const r = await api(`/api/v1/review/${id}/history`);
+    if (!r.ok) { box.textContent = '無法取得處理紀錄'; return; }
+    const h = await r.json();
+    document.getElementById('historyTitle').textContent = `處理紀錄：${h.store || '（未填店家）'} ${fmtMoney(Number(h.amount) || 0)}`;
+    box.textContent = '';
+    h.steps.forEach(s => {  // 一律用 textContent，不經 innerHTML
+      const div = document.createElement('div');
+      div.className = 'history-step';
+      const what = document.createElement('div');
+      what.textContent = `${s.action}・${s.actor || ''}` + (s.to_status ? `：${s.from_status ? s.from_status + ' → ' : ''}${s.to_status}` : '') + (s.self_review ? '（自審）' : '');
+      const when = document.createElement('small');
+      when.textContent = s.time + (s.comment ? `　意見：${s.comment}` : '');
+      div.append(what, when);
+      box.appendChild(div);
+    });
+  } catch (e) { box.textContent = '連不上伺服器'; }
+}
+function closeHistory() {
+  document.getElementById('historyBackdrop').classList.remove('show');
+  document.getElementById('historySheet').classList.remove('show');
+}
+async function exportCsv(kind) {
+  const events = kind === 'events';
   const f = document.getElementById('exportFrom').value, t = document.getElementById('exportTo').value;
   if (f && t && f > t) { showToast('開始日期不能晚於結束日期'); return; }
   try {
     const q = new URLSearchParams();
     if (f) q.set('from', f);
     if (t) q.set('to', t);
-    const r = await api('/api/v1/export?' + q.toString());
-    if (!r.ok) { showToast(r.status === 403 ? '只有主管或管理員可以匯出' : '匯出失敗（' + r.status + '）'); return; }
+    const r = await api((events ? '/api/v1/export/events?' : '/api/v1/export?') + q.toString());
+    if (!r.ok) { showToast(r.status === 403 ? '只有審核人員或管理員可以匯出' : '匯出失敗（' + r.status + '）'); return; }
     const text = await r.text();
     // 加上 BOM，Excel 才會以 UTF-8 開啟，中文不會變亂碼
     const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
-    if (!await saveFile(`支出申報_${f || '最早'}_至_${t || '最新'}.csv`, blob)) return;
+    if (!await saveFile(`${events ? '處理紀錄' : '支出申報'}_${f || '最早'}_至_${t || '最新'}.csv`, blob)) return;
     const n = Math.max(0, text.trim().split('\n').length - 1);
     showToast(n ? `已匯出 ${n} 筆` : '這段期間沒有申報（已匯出空白表）');
   } catch (e) { showToast('連不上伺服器'); }
 }
 async function loadReviewQueue(mode) {
   document.getElementById('rqSampled').dataset.on = mode === 'sampled' ? '1' : '0';
+  document.getElementById('bulkRow').style.display = mode === 'held' ? 'flex' : 'none';
   const list = document.getElementById('reviewList');
   list.innerHTML = '';
   let items = [];
@@ -2038,11 +2104,12 @@ async function loadReviewQueue(mode) {
     const files = ['receipt', 'signature', 'voucher'].filter(k => it.files && it.files[k])
       .map(k => `<button class="mini-btn" onclick="viewFile(${Number(it.id)}, '${k}')">${{ receipt: '看收據', signature: '看簽名', voucher: '看憑證' }[k]}</button>`).join('');
     const reasons = (it.review_reasons || []).join('；');
-    div.innerHTML = `<div class="entry-body">
+    const pick = mode === 'held' ? `<input type="checkbox" class="rq-pick" aria-label="勾選這筆" data-id="${Number(it.id)}" data-amount="${Number(it.amount) || 0}">` : '';
+    div.innerHTML = `${pick}<div class="entry-body">
       <div class="entry-top"><div class="entry-store">${escapeHtml(it.store || '（未填店家）')}</div><div class="entry-amount">${fmtMoney(Number(it.amount) || 0)}</div></div>
       <div class="entry-meta"><span class="tag tag-user">${escapeHtml(it.employee || '')}</span><span class="tag tag-cat">${escapeHtml(it.doc_type || '')}</span><span class="tag tag-case">${escapeHtml(it.case_no || '')}</span><span class="tag tag-cat">${escapeHtml(it.category || '')}</span><span class="entry-date">${escapeHtml(it.created_day || '')}</span></div>
       ${reasons ? `<div class="auto-note warn">${escapeHtml(reasons)}</div>` : ''}
-      <div class="entry-actions">${files}${mode === 'held' ? `<button class="mini-btn" onclick="decideItem(${Number(it.id)}, 'approve')">核准</button>` : ''}<button class="mini-btn danger" onclick="decideItem(${Number(it.id)}, 'reject')">退回</button></div></div>`;
+      <div class="entry-actions">${files}<button class="mini-btn" onclick="showHistory(${Number(it.id)})">處理紀錄</button>${mode === 'held' ? `<button class="mini-btn" onclick="decideItem(${Number(it.id)}, 'approve')">核准</button>` : ''}<button class="mini-btn danger" onclick="decideItem(${Number(it.id)}, 'reject')">退回</button></div></div>`;
     list.appendChild(div);
   });
 }
@@ -2124,7 +2191,7 @@ function onSyncFlush(r) {
   } else if (r.sent === 1) {
     const e = entries.find(x => x.clientId === Object.keys(r.results)[0]);
     if (e && e.status === 'rejected') showToast('這張被退回：' + friendlyReasons(e.reviewReasons));
-    else showToast(e && e._wasReview ? '已送出，主管確認中' : (e && e._signed ? '申報已送出（含簽收單）' : '申報已送出'));
+    else showToast(e && e._wasReview ? '已送出，審核中' : (e && e._signed ? '申報已送出（含簽收單）' : '申報已送出'));
   } else if (r.sent > 1) {
     showToast(`已同步 ${r.sent} 筆資料`);
   }

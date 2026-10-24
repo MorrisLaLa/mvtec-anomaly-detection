@@ -118,3 +118,11 @@
 - 欄名改為中文（`app/routers/expenses.py` 的 `EXPORT_HEADERS`，欄位白名單與順序不變）；代碼轉中文：審核狀態（已核准／待審核／已退回）、是否欄位（是／否）、用途來源、辨識方式、辨識信心、自動審核者（`自動（v1）`）；審核理由改以「；」分隔。
 - 不變：篩選參數仍用英文代碼（`status=approved` 等）、資料庫內容、公式注入防護、稽核記錄。
 - 驗收：`tests/test_export_chinese.py`。
+
+## 修訂：會計審核、一鍵核准、處理紀錄（使用者決定，台北 2026-10-24）
+- 會計取代主管：角色不變（`reviewer`），畫面用語「主管」改為「審核」／「審核人員」。給會計建一台 reviewer 裝置即可。
+- 勾選後一鍵核准：`POST /api/v1/review/bulk-approve {ids: [...], comment?}`（reviewer／admin；1–200 筆）。只核准「待審核」；**自己的申報一律略過（包括管理員）**；已決定、找不到的也略過並回報原因；每筆各寫一筆審核事件（預設意見「批次核准」），存取記錄寫 `bulk_approve`。前台：勾選框、全選、核准前確認筆數與總金額。
+- 每筆處理紀錄：`GET /api/v1/review/{id}/history`：送出申報 → 自動判斷 → 人工審核（誰、何時、狀態變化、意見、是否自審），時間為台北時間。前台：審核清單每筆的「處理紀錄」。
+- 匯出完整處理紀錄：`GET /api/v1/export/events?from&to`（依動作的台北日期篩選），每個動作一列，中文欄名，套用公式防護，存取記錄寫 `export_events`。前台：「匯出處理紀錄」。
+- 紀錄來源：既有的 `review_events`（資料庫觸發器禁止修改與刪除）。未改 schema。
+- 驗收：`tests/test_review_trail.py`、`tests/test_review_trail_ui.py`、`tests/test_demo_review_trail.py`。

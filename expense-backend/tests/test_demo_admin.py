@@ -16,7 +16,7 @@ def row(page, name):
 def test_admin_demo_lists_devices_and_unblocks(page):
     as_admin(page)
     t = page.inner_text("#adminDevices")
-    assert "王志明" in t and "陳主管" in t and "（我）" in t
+    assert "王志明" in t and "林會計" in t and "（我）" in t
     page.click("#unblockBtn")
     page.wait_for_selector("#toast >> text=已解除")
     assert page.errors == []
@@ -24,7 +24,7 @@ def test_admin_demo_lists_devices_and_unblocks(page):
 
 def test_admin_demo_enforces_two_admin_limit_and_transfer(page):
     as_admin(page)
-    row(page, "陳主管").locator("button:has-text('設為管理員')").click()
+    row(page, "林會計").locator("button:has-text('設為管理員')").click()
     page.wait_for_selector("#toast >> text=已變更")
     page.wait_for_selector("#adminDevices >> text=另一位管理員")
     row(page, "王志明").locator("button:has-text('設為管理員')").click()
@@ -42,7 +42,7 @@ def test_admin_demo_enforces_two_admin_limit_and_transfer(page):
 
 
 def test_submitter_and_reviewer_demo_have_no_admin_tools(page):
-    bind(page, "主管（")
+    bind(page, "審核人員（")
     page.wait_for_selector("#screen-home", state="visible")
     page.click(".brand-user")
     page.wait_for_selector("#screen-settings", state="visible")
