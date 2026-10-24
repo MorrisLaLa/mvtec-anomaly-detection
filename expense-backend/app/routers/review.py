@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Path as PathParam, Query,
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from .. import admin as admin_ops
 from .. import review as engine
-from ..auth import any_device, require_role, reviewer_only
+from ..auth import ROLES, any_device, require_role, reviewer_only
 from .expenses import get_db
 
 router = APIRouter()
@@ -111,3 +112,57 @@ def unblock(request: Request, device=require_role("admin")):
     fails.events.clear()
     st.access_log.event("unblock", now, device_id=device["id"], cleared=cleared)
     return {"ok": True, "cleared": cleared}
+
+
+# ---------- M1 修訂 7：管理員手機上調整角色（管理員 1–2 位） ----------
+admin_only = require_role("admin")
+
+
+class RoleChange(BaseModel):
+    device_id: int
+    role: str
+
+
+class Transfer(BaseModel):
+    device_id: int
+
+
+@router.get("/admin/devices")
+def admin_devices(device=admin_only, db=Depends(get_db)):
+    return [{"id": d["id"], "name": d["name"], "role": d["role"], "status": d["status"], "is_me": d["id"] == device["id"]}
+            for d in admin_ops.list_devices(db) if not d["revoked_at"]]
+
+
+def _apply(fn, *args):
+    try:
+        return fn(*args)
+    except LookupError:
+        raise HTTPException(404, "找不到這台裝置")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@router.post("/admin/role")
+def admin_set_role(body: RoleChange, request: Request, device=admin_only, db=Depends(get_db)):
+    if body.role not in ROLES:
+        raise HTTPException(422, f"role 只能是 {'／'.join(ROLES)}")
+    target = admin_ops.active_device(db, body.device_id)
+    if not target:
+        raise HTTPException(404, "找不到這台裝置")
+    if target["role"] == "admin" and target["id"] != device["id"] and body.role != "admin":
+        # 手機被偷時，不能用它把真正的管理員踢掉
+        raise HTTPException(403, "手機上不能拿掉另一位管理員，請在主機上執行 python -m app.admin set-role")
+    old, new = _apply(admin_ops.set_role, db, body.device_id, body.role)
+    st = request.app.state
+    st.access_log.event("role_change", st.clock(), device_id=device["id"], target_device_id=body.device_id,
+                        from_role=old, to_role=new)
+    return {"ok": True, "from_role": old, "to_role": new}
+
+
+@router.post("/admin/transfer")
+def admin_transfer(body: Transfer, request: Request, device=admin_only, db=Depends(get_db)):
+    _apply(admin_ops.transfer_admin, db, device["id"], body.device_id)
+    st = request.app.state
+    st.access_log.event("admin_transfer", st.clock(), device_id=device["id"], target_device_id=body.device_id,
+                        from_role=None, to_role="admin")
+    return {"ok": True}

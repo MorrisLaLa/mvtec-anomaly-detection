@@ -126,3 +126,15 @@
 - 前台：設定頁的「解除登入封鎖」按鈕，只在角色為 admin 時顯示；隱藏按鈕不是安全措施，權限由伺服器檢查。
 - 限制：失敗計數存在單一程序的記憶體中（目前 uvicorn 只有一個 worker）；如果攻擊還在持續，解除後會立刻再次被封鎖，根本解法仍是 D2 的實機確認。
 - 驗收：`tests/test_admin_unblock.py`、`tests/test_admin_unblock_ui.py`。
+
+## 修訂 7：管理員人數與權限轉移（使用者決定，台北 2026-10-24）
+- 使用者決定：管理員**最少 1 位**（有了第一位之後）、**最多 2 位**；權限可以轉移、增加、減少；主機指令與管理員手機都能操作。
+- 規則統一寫在 `app/admin.py`（`set_role`、`transfer_admin`、`create_device`、`revoke` 共用），主機指令與手機都經過同一套檢查：
+  - 建立或升級成第 3 位管理員 → 拒絕；降級或撤銷最後 1 位管理員 → 拒絕。
+  - 轉移：對方變成管理員、自己變成主管（仍可審核與申報），在同一個交易中完成。
+- 主機指令：`python -m app.admin set-role --name <名稱> --role <角色>`、`transfer-admin --from <名稱> --to <名稱>`。
+- 手機（只限 admin）：`GET /api/v1/admin/devices`（不含金鑰或雜湊）、`POST /api/v1/admin/role`、`POST /api/v1/admin/transfer`。這是修訂 6 之外，另一組由使用者核准的網頁管理功能。
+- **安全限制（實作時加上，已告知使用者）**：手機上不能拿掉「另一位」管理員（403，請到主機操作），只能調整自己（降級或轉移）與非管理員。目的是手機被偷時，不能用它把真正的管理員踢掉。
+- 每次變更都寫入存取記錄（`role_change`、`admin_transfer`，含操作者與對象裝置）。
+- 驗收：`tests/test_admin_roles.py`、`tests/test_admin_roles_ui.py`。
+- 已知風險：手機被偷且有空位時，小偷可以把另一台裝置升為管理員；靠存取記錄追查，並在主機上撤銷。

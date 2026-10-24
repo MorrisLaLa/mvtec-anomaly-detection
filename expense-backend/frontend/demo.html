@@ -880,6 +880,8 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
       <div id="adminTools" style="display:none; margin-top:18px;">
         <button class="btn btn-secondary" id="unblockBtn" onclick="unblockLogins()">解除登入封鎖</button>
         <div class="onboard-sub">有人打錯太多次時，其他人可能暫時無法綁定新手機；按這裡立即解除（只有管理員看得到）。</div>
+        <div class="onboard-sub" style="margin-top:14px;font-weight:600;">裝置與權限（管理員最少 1 位、最多 2 位）</div>
+        <div id="adminDevices"></div>
       </div>
     </div>
   </div>
@@ -1550,7 +1552,67 @@ let pinContext = 'unlock';  // 'unlock'（開啟 App 時）| 'settings'（從設
 function openSettings() {
   document.getElementById('pinEnabled').checked = !!(currentUser && loadPins()[currentUser]);
   document.getElementById('adminTools').style.display = myRole === 'admin' ? 'block' : 'none';  // 只是隱藏；伺服器端另有角色檢查
+  if (myRole === 'admin') loadAdminDevices();
   showScreen('screen-settings');
+}
+const ROLE_LABEL = { submitter: '申報人', reviewer: '主管', admin: '管理員' };
+async function loadAdminDevices() {
+  const box = document.getElementById('adminDevices');
+  let rows = [];
+  try {
+    const r = await api('/api/v1/admin/devices');
+    if (!r.ok) return;
+    rows = await r.json();
+  } catch (e) { showToast('連不上伺服器'); return; }
+  box.textContent = '';
+  rows.forEach(d => {  // 名稱一律用 textContent，不經 innerHTML
+    const div = document.createElement('div');
+    div.className = 'admin-dev entry-actions';
+    const label = document.createElement('span');
+    label.textContent = `${d.name}　${ROLE_LABEL[d.role] || d.role}${d.is_me ? '（我）' : ''}`;
+    div.appendChild(label);
+    const btn = (text, fn) => { const b = document.createElement('button'); b.className = 'mini-btn'; b.textContent = text; b.onclick = fn; div.appendChild(b); };
+    if (d.role !== 'admin') {
+      btn('設為管理員', () => setDeviceRole(d.id, 'admin'));
+      btn(d.role === 'reviewer' ? '改為申報人' : '改為主管', () => setDeviceRole(d.id, d.role === 'reviewer' ? 'submitter' : 'reviewer'));
+      btn('轉移給他', () => transferAdmin(d.id, d.name));
+    } else if (d.is_me) {
+      btn('我不當管理員了', () => setDeviceRole(d.id, 'reviewer', true));
+    } else {
+      const note = document.createElement('span');
+      note.className = 'onboard-sub';
+      note.textContent = '（另一位管理員：要拿掉請在主機上操作）';
+      div.appendChild(note);
+    }
+    box.appendChild(div);
+  });
+}
+function leftAdmin() {
+  myRole = 'reviewer';
+  try { localStorage.setItem('expense_role', myRole); } catch (e) { /* 略過 */ }
+  document.getElementById('adminTools').style.display = 'none';
+}
+async function adminPost(path, body) {
+  const r = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let detail = '';
+  try { detail = (await r.json()).detail || ''; } catch (e) { /* 略過 */ }
+  if (!r.ok) showToast(typeof detail === 'string' && detail ? detail : '操作失敗（' + r.status + '）');
+  return r.ok;
+}
+async function setDeviceRole(id, role, self = false) {
+  try {
+    if (!await adminPost('/api/v1/admin/role', { device_id: id, role })) return;
+    showToast('已變更角色');
+    if (self) leftAdmin(); else loadAdminDevices();
+  } catch (e) { showToast('連不上伺服器'); }
+}
+async function transferAdmin(id, name) {
+  if (!window.confirm(`確定把你的管理員權限轉給「${name}」？轉移後你會變成主管。`)) return;
+  try {
+    if (!await adminPost('/api/v1/admin/transfer', { device_id: id })) return;
+    showToast('已轉移管理員權限');
+    leftAdmin();
+  } catch (e) { showToast('連不上伺服器'); }
 }
 async function unblockLogins() {
   try {

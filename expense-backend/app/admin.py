@@ -10,6 +10,7 @@ from . import database
 from .auth import ROLES, generate_key, generate_pair_token, hash_key, hash_pair_token, to_iso, from_iso
 
 DEFAULT_DAYS = 365
+ADMIN_MAX = 2  # M1 修訂 7：管理員最少 1 位（有了第一位之後）、最多 2 位
 
 
 def _now(now):
@@ -41,6 +42,8 @@ def create_device(conn, name, role, *, now=None, days=None, expires=None, never=
         exp = to_iso(now + timedelta(days=default_days))
     if conn.execute("SELECT 1 FROM devices WHERE name = ? AND revoked_at IS NULL", (name,)).fetchone():
         raise ValueError(f"已有同名且未撤銷的裝置：{name}（請先撤銷或換名稱）")
+    if role == "admin" and _admin_count(conn) >= ADMIN_MAX:
+        raise ValueError(_TOO_MANY)
     key = generate_key()
     cur = conn.execute("INSERT INTO devices(name, role, key_hash, created_at, expires_at) VALUES(?,?,?,?,?)",
                        (name, role, hash_key(key), to_iso(now), exp))
@@ -67,6 +70,60 @@ def similar_names(conn, name, role):
     """名稱相近、但角色不同的有效裝置（可能是同一人，會讓自審判斷失效；資安審查 S3）。"""
     rows = conn.execute("SELECT name, role FROM devices WHERE revoked_at IS NULL ORDER BY id").fetchall()
     return [r["name"] for r in rows if r["role"] != role and _looks_alike(name, r["name"])]
+
+
+_TOO_MANY = f"管理員最多 {ADMIN_MAX} 位，請先把其中一位降級或改用轉移"
+_LAST = "管理員至少要保留 1 位，請先增加另一位管理員或改用轉移"
+
+
+def _admin_count(conn):
+    return conn.execute("SELECT COUNT(*) FROM devices WHERE role = 'admin' AND revoked_at IS NULL").fetchone()[0]
+
+
+def active_device(conn, device_id):
+    return conn.execute("SELECT * FROM devices WHERE id = ? AND revoked_at IS NULL", (device_id,)).fetchone()
+
+
+def device_id_by_name(conn, name):
+    row = conn.execute("SELECT id FROM devices WHERE name = ? AND revoked_at IS NULL", (name,)).fetchone()
+    if not row:
+        raise LookupError(f"找不到裝置：{name}")
+    return row["id"]
+
+
+def set_role(conn, device_id, role):
+    """變更有效裝置的角色；維持管理員 1–2 位。回傳 (舊角色, 新角色)。"""
+    if role not in ROLES:
+        raise ValueError(f"role 必須是 {ROLES}")
+    dev = active_device(conn, device_id)
+    if not dev:
+        raise LookupError("找不到這台裝置")
+    old = dev["role"]
+    if old == role:
+        return old, role
+    if role == "admin" and _admin_count(conn) >= ADMIN_MAX:
+        raise ValueError(_TOO_MANY)
+    if old == "admin" and _admin_count(conn) <= 1:
+        raise ValueError(_LAST)
+    conn.execute("UPDATE devices SET role = ? WHERE id = ?", (role, device_id))
+    conn.commit()
+    return old, role
+
+
+def transfer_admin(conn, from_id, to_id):
+    """把 from 的管理員權限轉給 to：to 變管理員、from 變主管（仍可審核與申報），在同一個交易中完成。"""
+    a, b = active_device(conn, from_id), active_device(conn, to_id)
+    if not a or not b:
+        raise LookupError("找不到這台裝置")
+    if from_id == to_id:
+        raise ValueError("不能轉移給自己")
+    if a["role"] != "admin":
+        raise ValueError("只有管理員可以轉移管理權限")
+    if b["role"] == "admin":
+        raise ValueError("對方已經是管理員")
+    with conn:
+        conn.execute("UPDATE devices SET role = 'admin' WHERE id = ?", (to_id,))
+        conn.execute("UPDATE devices SET role = 'reviewer' WHERE id = ?", (from_id,))
 
 
 def create_pairing_code(conn, name, *, now=None, ttl_hours=24):
@@ -107,6 +164,9 @@ def list_devices(conn, *, now=None):
 
 
 def revoke(conn, name, *, now=None):
+    row = conn.execute("SELECT role FROM devices WHERE name = ? AND revoked_at IS NULL", (name,)).fetchone()
+    if row and row["role"] == "admin" and _admin_count(conn) <= 1:
+        raise ValueError(_LAST)
     cur = conn.execute("UPDATE devices SET revoked_at = ? WHERE name = ? AND revoked_at IS NULL", (to_iso(_now(now)), name))
     conn.commit()
     if cur.rowcount == 0:
@@ -157,6 +217,12 @@ def main(argv=None) -> int:
         sp.add_argument("--days", type=int)
         sp.add_argument("--expires", help="YYYY-MM-DD（UTC）")
         sp.add_argument("--never", action="store_true", help="永不過期（不建議）")
+    sr = sub.add_parser("set-role", help=f"變更角色（管理員 1–{ADMIN_MAX} 位）")
+    sr.add_argument("--name", required=True)
+    sr.add_argument("--role", required=True, choices=ROLES)
+    ta = sub.add_parser("transfer-admin", help="把管理員權限轉給另一台裝置（原管理員改為主管）")
+    ta.add_argument("--from", dest="from_name", required=True)
+    ta.add_argument("--to", dest="to_name", required=True)
     sub.add_parser("list")
     r = sub.add_parser("revoke")
     r.add_argument("--name", required=True)
@@ -190,13 +256,19 @@ def main(argv=None) -> int:
             for d in list_devices(conn):
                 left = "永不過期" if d["days_left"] is None else f"剩 {d['days_left']} 天"
                 print(f"{d['id']:>3}  {d['name']}  {d['role']}  {d['status']}  {left}" + (f"  ⚠ {d['warning']}" if d["warning"] else ""))
+        elif a.cmd == "set-role":
+            old, new = set_role(conn, device_id_by_name(conn, a.name), a.role)
+            print(f"已變更角色：{a.name}  {old} → {new}")
+        elif a.cmd == "transfer-admin":
+            transfer_admin(conn, device_id_by_name(conn, a.from_name), device_id_by_name(conn, a.to_name))
+            print(f"已轉移管理員權限：{a.from_name} → {a.to_name}（{a.from_name} 改為主管）")
         elif a.cmd == "revoke":
             revoke(conn, a.name)
             print(f"已撤銷：{a.name}")
         elif a.cmd == "set-expiry":
             set_expiry(conn, a.name, days=a.days, expires=a.expires, never=a.never)
             print(f"已更新到期設定：{a.name}")
-    except ValueError as e:
+    except (ValueError, LookupError) as e:
         print(f"錯誤：{e}", file=sys.stderr)
         return 2
     finally:
