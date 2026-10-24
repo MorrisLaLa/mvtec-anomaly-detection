@@ -48,6 +48,27 @@ def create_device(conn, name, role, *, now=None, days=None, expires=None, never=
     return {"id": cur.lastrowid, "name": name, "role": role, "expires_at": exp, "key": key}
 
 
+def _norm(name):
+    return "".join(name.lower().split())
+
+
+def _looks_alike(a, b):
+    """共同子字串：中文等非 ASCII 字 ≥2 字，英數 ≥4 字（避免 an、ng 這類誤報）。"""
+    a, b = _norm(a), _norm(b)
+    for i in range(len(a)):
+        for j in range(i + 2, len(a) + 1):
+            s = a[i:j]
+            if (len(s) >= 4 or not s.isascii()) and s in b:
+                return True
+    return False
+
+
+def similar_names(conn, name, role):
+    """名稱相近、但角色不同的有效裝置（可能是同一人，會讓自審判斷失效；資安審查 S3）。"""
+    rows = conn.execute("SELECT name, role FROM devices WHERE revoked_at IS NULL ORDER BY id").fetchall()
+    return [r["name"] for r in rows if r["role"] != role and _looks_alike(name, r["name"])]
+
+
 def create_pairing_code(conn, name, *, now=None, ttl_hours=24):
     """為未撤銷的裝置產生一次性配對碼（只存雜湊）。"""
     now = _now(now)
@@ -123,6 +144,8 @@ def main(argv=None) -> int:
     c.add_argument("--name", required=True)
     c.add_argument("--role", required=True, choices=ROLES)
     c.add_argument("--show-key", action="store_true", help="直接顯示長金鑰（手動輸入備案），不產生配對連結")
+    c.add_argument("--confirm-different-person", action="store_true",
+                   help="名稱與其他角色的裝置相近，但確認不是同一人（同一人只要一台裝置：主管裝置也能申報）")
     pl = sub.add_parser("pair-link", help="為既有裝置重新產生配對連結（配對成功後舊金鑰失效）")
     pl.add_argument("--name", required=True)
     for sp in (c, pl):
@@ -145,6 +168,15 @@ def main(argv=None) -> int:
     conn = database.connect(db)
     try:
         if a.cmd == "create-device":
+            alike = similar_names(conn, a.name, a.role)
+            if alike and not a.confirm_different_person:
+                raise ValueError(f"「{a.name}」與其他角色的裝置名稱相近：{'、'.join(alike)}。"
+                                 "同一人只要一台裝置（主管裝置也能申報，系統靠名稱防止自審）；"
+                                 "若確定不是同一人，請加上 --confirm-different-person 再執行")
+            if a.role != "submitter":
+                names = [r["name"] for r in conn.execute(
+                    "SELECT name FROM devices WHERE role='submitter' AND revoked_at IS NULL ORDER BY id")]
+                print("現有申報人：" + ("、".join(names) or "（無）") + "。若其中有同一人，請撤銷他的申報人裝置，只留這台（主管裝置也能申報）。")
             d = create_device(conn, a.name, a.role, days=a.days, expires=a.expires, never=a.never,
                               default_days=settings.device_key_default_days)
             print(f"已建立裝置「{d['name']}」（{d['role']}），到期：{d['expires_at'] or '永不過期'}")
