@@ -19,11 +19,16 @@ class _Exceeded(Exception):
 class BodyLimitMiddleware:
     """純 ASGI：依 Content-Length 先行拒絕；沒有 Content-Length（分塊）則邊讀邊計，超過就中止。"""
 
-    def __init__(self, app, max_bytes: int, paths=("/api/v1/submit",)):
-        self.app, self.max_bytes, self.paths = app, max_bytes, tuple(paths)
+    def __init__(self, app, max_bytes: int, paths=("/api/v1/submit",), exclude=()):
+        """paths=None：套用到所有 POST（exclude 除外），用於 JSON 端點的小上限。"""
+        self.app, self.max_bytes = app, max_bytes
+        self.paths, self.exclude = (None if paths is None else tuple(paths)), tuple(exclude)
+
+    def _applies(self, path):
+        return path not in self.exclude if self.paths is None else path in self.paths
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope.get("method") != "POST" or scope.get("path") not in self.paths:
+        if scope["type"] != "http" or scope.get("method") != "POST" or not self._applies(scope.get("path")):
             return await self.app(scope, receive, send)
         started = False
 

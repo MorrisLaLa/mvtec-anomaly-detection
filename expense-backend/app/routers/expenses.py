@@ -7,7 +7,7 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import classify
 from datetime import datetime, timedelta, timezone
@@ -33,15 +33,15 @@ def get_db(request: Request):
         conn.close()
 
 
-class Correction(BaseModel):
-    store: str
-    from_category: str | None = None
-    to_category: str
+class Correction(BaseModel):  # 長度上限與 submit 的 store／category 一致
+    store: str = Field(max_length=100)
+    from_category: str | None = Field(None, max_length=30)
+    to_category: str = Field(max_length=30)
 
 
 class RuleConfirm(BaseModel):
-    store: str
-    category: str
+    store: str = Field(max_length=100)
+    category: str = Field(max_length=30)
 
 
 def _recognize(receipt: bytes, my_tax_id: str, ocr) -> dict:
@@ -349,7 +349,7 @@ def export(request: Request, status: str = "", from_: str = Query("", alias="fro
     w = csv.writer(buf)
     w.writerow(EXPORT_COLUMNS)
     for r in rows:
-        w.writerow([("'" + v if isinstance(v, str) and v[:1] in "=+-@" else v) for v in tuple(r)])
+        w.writerow([("'" + v if isinstance(v, str) and v and v[0] in "=+-@\t\r" else v) for v in tuple(r)])
     st = request.app.state
     st.access_log.event("export", st.clock(), device_id=device["id"], rows=len(rows), filters=bool(where))
     return Response(buf.getvalue(), media_type="text/csv; charset=utf-8")

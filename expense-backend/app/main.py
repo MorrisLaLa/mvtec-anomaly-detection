@@ -15,6 +15,9 @@ from .routers import expenses, pair, review
 from .storage import LocalStorage, StorageBackend
 
 
+JSON_BODY_LIMIT = 64 * 1024  # 視窗 8：/pair（免金鑰）等 JSON 端點不需要大本體
+
+
 def create_app(
     settings: Settings | None = None,
     ocr: OCRProvider | None = None,
@@ -22,7 +25,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or load_settings()
     database.init_db(settings.db_path, settings.default_rules)
-    app = FastAPI(title="Expense Backend")
+    app = FastAPI(title="Expense Backend", docs_url=None, redoc_url=None, openapi_url=None)  # 視窗 8：不公開 API 清單
     app.state.settings = settings
     app.state.clock = lambda: datetime.now(timezone.utc)
     app.state.fail_window = SlidingWindow()
@@ -46,6 +49,7 @@ def create_app(
         app.mount("/pwa", StaticFiles(directory=frontend, html=True), name="pwa")
     # 最外層依序：存取記錄（也記錄被擋下的請求）→ 請求大小限制 → 其餘
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_bytes, paths=("/api/v1/submit",))
+    app.add_middleware(BodyLimitMiddleware, max_bytes=JSON_BODY_LIMIT, paths=None, exclude=("/api/v1/submit",))
     app.add_middleware(AccessLogMiddleware, log_factory=lambda: (app.state.access_log, app.state.clock()))
     return app
 

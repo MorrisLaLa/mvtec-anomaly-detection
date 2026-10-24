@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path as PathParam, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from ..auth import any_device, reviewer_only
 from .expenses import get_db
 
 router = APIRouter()
+ExpenseId = PathParam(ge=1, le=2**63 - 1)  # 超出 SQLite INTEGER 範圍會變成 500
 KINDS = {"receipt": "receipt_path", "signature": "signature_path", "voucher": "voucher_path"}
 
 
@@ -54,7 +55,7 @@ def items(status: str = "held", sampled: int | None = None, limit: int = Query(1
 
 
 @router.post("/review/{expense_id}/decision")
-def decide(expense_id: int, body: Decision, request: Request, device=reviewer_only, db=Depends(get_db)):
+def decide(body: Decision, request: Request, expense_id: int = ExpenseId, device=reviewer_only, db=Depends(get_db)):
     st = request.app.state
     if body.decision not in ("approve", "reject"):
         raise HTTPException(422, "decision 只能是 approve 或 reject")
@@ -84,7 +85,7 @@ def decide(expense_id: int, body: Decision, request: Request, device=reviewer_on
 
 
 @router.get("/files/{expense_id}/{kind}")
-def get_file(expense_id: int, kind: str, request: Request, device=reviewer_only, db=Depends(get_db)):
+def get_file(kind: str, request: Request, expense_id: int = ExpenseId, device=reviewer_only, db=Depends(get_db)):
     col = KINDS.get(kind)
     if not col:
         raise HTTPException(404, "not found")
