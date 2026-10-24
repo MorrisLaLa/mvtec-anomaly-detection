@@ -808,6 +808,8 @@
   .entry-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
   .mini-btn { border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 9px; font-size:11px; font-weight:600; cursor:pointer; }
   .mini-btn.danger { color:var(--alert); border-color:var(--alert); }
+  .export-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 18px; border-top:1px solid var(--line); color:var(--ink-soft); }
+  .export-row input { border:1.5px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); padding:6px 8px; min-height:44px; font-size:16px; }
 
   ::selection { background: var(--hazard); color: var(--hazard-ink); }
 
@@ -970,6 +972,13 @@
     <div class="wifi-row" style="gap:8px;">
       <button class="mini-btn" id="rqHeld" onclick="loadReviewQueue('held')">待處理</button>
       <button class="mini-btn" id="rqSampled" onclick="loadReviewQueue('sampled')">自動核准・抽查</button>
+    </div>
+    <div class="export-row">
+      <span>申報日期</span>
+      <input type="date" id="exportFrom" aria-label="匯出開始日期">
+      <span>至</span>
+      <input type="date" id="exportTo" aria-label="匯出結束日期">
+      <button class="mini-btn" id="exportBtn" onclick="exportCsv()">匯出 CSV（給會計）</button>
     </div>
     <div class="entry-list" id="reviewList"></div>
   </div>
@@ -1979,7 +1988,33 @@ async function refreshReviewCount() {
     if (r.ok) document.getElementById('reviewBarText').textContent = `主管審核：${(await r.json()).length} 筆待處理`;
   } catch (e) { /* 離線 */ }
 }
-function openReviewQueue() { showScreen('screen-reviewq'); loadReviewQueue('held'); }
+function openReviewQueue() {
+  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);  // 台北日期，與伺服器的申報日期一致
+  if (!document.getElementById('exportFrom').value) document.getElementById('exportFrom').value = today.slice(0, 8) + '01';
+  if (!document.getElementById('exportTo').value) document.getElementById('exportTo').value = today;
+  showScreen('screen-reviewq'); loadReviewQueue('held');
+}
+async function exportCsv() {
+  const f = document.getElementById('exportFrom').value, t = document.getElementById('exportTo').value;
+  if (f && t && f > t) { showToast('開始日期不能晚於結束日期'); return; }
+  try {
+    const q = new URLSearchParams();
+    if (f) q.set('from', f);
+    if (t) q.set('to', t);
+    const r = await api('/api/v1/export?' + q.toString());
+    if (!r.ok) { showToast(r.status === 403 ? '只有主管或管理員可以匯出' : '匯出失敗（' + r.status + '）'); return; }
+    const text = await r.text();
+    // 加上 BOM，Excel 才會以 UTF-8 開啟，中文不會變亂碼
+    const url = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `支出申報_${f || '最早'}_至_${t || '最新'}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    const n = Math.max(0, text.trim().split('\n').length - 1);
+    showToast(n ? `已匯出 ${n} 筆` : '這段期間沒有申報（已匯出空白表）');
+  } catch (e) { showToast('連不上伺服器'); }
+}
 async function loadReviewQueue(mode) {
   document.getElementById('rqSampled').dataset.on = mode === 'sampled' ? '1' : '0';
   const list = document.getElementById('reviewList');

@@ -96,6 +96,22 @@
         return json(200, { ok: true });
       }
     }
+    if (path === '/export') {  // 與正式版相同的欄位與公式防護；依申報日期篩選
+      const cols = ['id', 'client_id', 'case_no', 'owner_case_no', 'doc_type', 'employee', 'amount', 'expense_date', 'store',
+        'seller_tax_id', 'buyer_tax_id', 'invoice_no', 'invoice_date', 'category', 'category_source', 'recognition_source',
+        'recognition_confidence', 'needs_review', 'review_status', 'reviewed_by', 'reviewed_at', 'review_reasons',
+        'review_comment', 'sampled', 'created_day'];
+      const f = query.get('from') || '', t = query.get('to') || '';
+      const cell = (v) => {
+        if (v === undefined || v === null) return '';
+        let s = Array.isArray(v) ? JSON.stringify(v) : typeof v === 'boolean' ? String(Number(v)) : String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const rows = state.items.filter((x) => (!f || x.created_day >= f) && (!t || x.created_day <= t))
+        .map((x) => cols.map((c) => cell(c === 'needs_review' ? x.review_status === 'held' : x[c])).join(','));
+      return new Response([cols.join(','), ...rows].join('\r\n') + '\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8' } });
+    }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');
       return json(200, state.items.filter((x) => x.review_status === st && (sp === null || !!x.sampled === (sp === '1'))).map(pub));
