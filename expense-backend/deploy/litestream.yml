@@ -1,0 +1,11 @@
+# Litestream：把 SQLite 持續複寫到儲存桶（秒級，補足每日備份）。
+# 憑證不寫在這裡：在 GCP 使用 VM 的服務帳號（預設應用程式憑證）。BACKUP_BUCKET 由環境變數提供。
+# 啟用方式：  docker compose --profile replicate up -d
+dbs:
+  - path: /data/expense.db
+    replicas:
+      - type: gcs
+        bucket: ${BACKUP_BUCKET}
+        path: litestream/expense
+        retention: 720h          # 保留 30 天的細粒度還原點（更長期的保留由儲存桶版本控制與每日備份負責）
+        snapshot-interval: 24h

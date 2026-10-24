@@ -1,0 +1,2368 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>支出申報 — 示範</title>
+<meta name="theme-color" content="#F5B700">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="支出申報">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231B1F1D'/%3E%3Ctext x='50' y='64' font-family='sans-serif' font-size='46' font-weight='700' fill='%23F5B700' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%E6%94%AF%E5%87%BA%E7%94%B3%E5%A0%B1%22%2C%22short_name%22%3A%22%E6%94%AF%E5%87%BA%E7%94%B3%E5%A0%B1%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23EFEDE6%22%2C%22theme_color%22%3A%22%23F5B700%22%7D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+TC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1B1F1D;
+    --ink-soft: #565F5A;
+    --paper: #EFEDE6;
+    --surface: #FFFFFF;
+    --hazard: #F5B700;
+    --hazard-ink: #3A2C00;
+    --steel: #3E5C63;
+    --steel-soft: #E4EAEA;
+    --alert: #C1440E;
+    --alert-soft: #FBE7DD;
+    --good: #2F6F4E;
+    --good-soft: #E3EFE8;
+    --line: #D8D4C8;
+    --line-strong: #B7B2A2;
+    --shadow: 0 1px 2px rgba(27,31,29,0.06), 0 4px 14px rgba(27,31,29,0.07);
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --ink: #EDEBE3;
+      --ink-soft: #A9A79C;
+      --paper: #17191A;
+      --surface: #202322;
+      --hazard: #F5B700;
+      --hazard-ink: #241C00;
+      --steel: #8FB4BB;
+      --steel-soft: #253133;
+      --alert: #E2703A;
+      --alert-soft: #3A2419;
+      --good: #6FBE94;
+      --good-soft: #1E2E26;
+      --line: #34362F;
+      --line-strong: #46483E;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #EDEBE3;
+    --ink-soft: #A9A79C;
+    --paper: #17191A;
+    --surface: #202322;
+    --hazard: #F5B700;
+    --hazard-ink: #241C00;
+    --steel: #8FB4BB;
+    --steel-soft: #253133;
+    --alert: #E2703A;
+    --alert-soft: #3A2419;
+    --good: #6FBE94;
+    --good-soft: #1E2E26;
+    --line: #34362F;
+    --line-strong: #46483E;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  /* Cross-brand normalization: iOS Safari, Android Chrome/WebView, Samsung Internet all style
+     native form controls differently — strip their defaults so the app looks the same everywhere. */
+  input, textarea, select, button {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0;
+    font-family: inherit;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="date"] { min-height: 22px; } /* iOS Safari collapses date inputs without an explicit min-height */
+  button, .chip, .case-option, .user-option, .pin-key, .entry, .btn { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    font-family: 'IBM Plex Sans TC', -apple-system, BlinkMacSystemFont, 'PingFang TC', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--paper);
+  }
+
+  /* ---------- Header ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: env(safe-area-inset-top, 0px) 0 0 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    padding: 14px 18px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .brand-title { font-size: 17px; font-weight: 700; letter-spacing: 0.01em; }
+  .brand-sub { font-size: 11.5px; color: var(--ink-soft); }
+  .case-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 7px 12px 7px 10px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .case-pill:active { transform: scale(0.97); }
+  .case-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+  .case-pill-text { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; line-height: 1.15; }
+  .case-pill-text small { display: block; font-family: 'IBM Plex Sans TC', sans-serif; font-weight: 400; font-size: 9.5px; color: var(--ink-soft); letter-spacing: 0.02em; }
+
+  /* ---------- Network status strip ---------- */
+  .net-strip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .net-strip.offline { background: var(--alert-soft); color: var(--alert); }
+  .net-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+  .net-strip.offline .net-dot { background: var(--alert); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .net-strip-hint { color: var(--ink-soft); opacity: 0.65; margin-left: auto; font-size: 10.5px; }
+  .net-strip.offline .net-strip-hint { color: var(--alert); opacity: 0.75; }
+
+  /* ---------- Voucher viewer ---------- */
+  .voucher-overlay {
+    position: fixed; inset: 0;
+    background: rgba(20,22,20,0.86);
+    z-index: 80;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: env(safe-area-inset-top, 20px) 20px calc(env(safe-area-inset-bottom, 20px) + 10px);
+  }
+  .voucher-overlay.show { display: flex; }
+  .voucher-overlay img { max-width: 100%; max-height: 76vh; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+  .voucher-close {
+    margin-top: 18px;
+    background: var(--surface);
+    color: var(--ink);
+    border: none;
+    padding: 11px 22px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .voucher-hint { color: #D8D4C8; font-size: 11.5px; margin-top: 10px; }
+
+  /* ---------- Onboarding / identity ---------- */
+  .onboard {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: calc(env(safe-area-inset-top, 0px) + 48px) 24px 24px;
+  }
+  .onboard-badge {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--ink);
+    color: var(--hazard);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 22px;
+    margin-bottom: 18px;
+  }
+  .onboard-title { font-size: 21px; font-weight: 700; margin-bottom: 6px; }
+  .onboard-sub { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 28px; }
+  .onboard-label { font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; }
+  .user-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+  .user-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 13px;
+    padding: 13px 14px;
+    cursor: pointer;
+  }
+  .user-option:active { transform: scale(0.98); }
+  .user-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--steel-soft);
+    color: var(--steel);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    flex: none;
+  }
+  .user-option-text { font-size: 14px; font-weight: 600; }
+  .onboard-divider { display: flex; align-items: center; gap: 10px; color: var(--ink-soft); font-size: 11px; margin: 4px 0 16px; }
+  .onboard-divider::before, .onboard-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .onboard-manual { display: flex; gap: 8px; }
+  .onboard-manual .field-box { flex: 1; padding: 12px 14px; }
+  .onboard-manual .field-box input { font-family: 'IBM Plex Sans TC', sans-serif; font-weight: 500; font-size: 16px; }
+  .onboard-manual-btn {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 12px;
+    padding: 0 18px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .brand-user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .brand-user svg { width: 11px; height: 11px; color: var(--ink-soft); opacity: 0.6; }
+  .tag-user { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); font-family: 'IBM Plex Mono', monospace; }
+
+  /* ---------- PIN ---------- */
+  .pin-dots { display: flex; gap: 16px; justify-content: center; margin: 6px 0 10px; }
+  .pin-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line-strong);
+    background: transparent;
+  }
+  .pin-dot.filled { background: var(--ink); border-color: var(--ink); }
+  .pin-error {
+    font-size: 12px;
+    color: var(--alert);
+    min-height: 18px;
+    margin-bottom: 14px;
+  }
+  .pin-shake { animation: pinShake 0.4s ease; }
+  @keyframes pinShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-9px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(4px); }
+  }
+  .pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 280px;
+    margin: 6px auto 0;
+  }
+  .pin-key {
+    aspect-ratio: 1;
+    min-height: 56px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pin-key:active { background: var(--steel-soft); transform: scale(0.95); }
+  .pin-key.pin-key-ghost { visibility: hidden; }
+  .pin-key.pin-key-back { border: none; background: transparent; color: var(--ink-soft); font-size: 15px; }
+  .pin-key.pin-key-back svg { width: 20px; height: 20px; }
+  .pin-alt-link {
+    margin-top: 22px;
+    font-size: 12.5px;
+    color: var(--steel);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    animation: fadeSlide 0.28s ease;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screen, .toast, .sheet, .processing-ring { animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- Home / list ---------- */
+  .section-label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    padding: 18px 18px 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .month-total { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--ink); }
+
+  .entry-list { padding: 0 14px 140px; display: flex; flex-direction: column; gap: 8px; }
+  .entry {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+  .entry.new { animation: popIn 0.4s ease; border-color: var(--good); }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .entry-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+    background: var(--steel-soft);
+    color: var(--steel);
+  }
+  .entry-icon svg { width: 18px; height: 18px; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .entry-store { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry-amount { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 15px; flex: none; }
+  .entry-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10.5px;
+    padding: 2.5px 7px;
+    border-radius: 6px;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .tag-case { background: var(--steel-soft); color: var(--steel); font-family: 'IBM Plex Mono', monospace; }
+  .tag-cat { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); }
+  .tag-review { background: var(--alert-soft); color: var(--alert); }
+  .tag-ok { background: var(--good-soft); color: var(--good); }
+  .tag-pending { background: var(--hazard); color: var(--hazard-ink); }
+  .entry-date { font-size: 10.5px; color: var(--ink-soft); }
+
+  .empty-hint {
+    margin: 8px 14px 0;
+    padding: 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  /* ---------- Bottom action bar ---------- */
+  .action-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, transparent, var(--paper) 26%);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .action-bar .btn-primary { flex: 1 1 100%; min-height: 64px; font-size: 20px; }
+  .action-bar .btn-secondary { flex: 1 1 0; min-height: 48px; font-size: 16px; }
+  .result { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 24px 20px; text-align: center; }
+  .result-title { font-size: 28px; font-weight: 700; line-height: 1.3; }
+  .result-sub { font-size: 18px; color: var(--ink-soft); }
+  .result-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+  .result-actions .btn { min-height: 56px; font-size: 18px; }
+  .more-toggle { width: 100%; min-height: 48px; margin: 4px 0 10px; }
+  .btn {
+    border: none;
+    border-radius: 14px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.12s ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    flex: 1.5;
+    background: var(--hazard);
+    color: var(--hazard-ink);
+    font-size: 15px;
+    padding: 15px 10px;
+    box-shadow: 0 4px 16px rgba(245,183,0,0.35);
+  }
+  .btn-secondary {
+    flex: 1;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13.5px;
+    padding: 15px 8px;
+    border: 1px solid var(--line-strong);
+  }
+  .btn svg { width: 19px; height: 19px; flex: none; }
+
+  /* ---------- Processing overlay ---------- */
+  .processing {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 40px;
+    text-align: center;
+  }
+  .processing-ring {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 3px solid var(--line);
+    border-top-color: var(--hazard);
+    animation: spin 0.85s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .processing-text { font-size: 13.5px; color: var(--ink-soft); }
+  .processing-sub { font-size: 12px; color: var(--ink-soft); opacity: 0.7; }
+
+  /* ---------- Review screen ---------- */
+  .review-scroll { flex: 1; overflow-y: auto; padding: 4px 16px 24px; }
+  .receipt-preview {
+    margin-top: 12px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 14px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    box-shadow: var(--shadow);
+  }
+  .receipt-thumb {
+    width: 52px; height: 68px;
+    border-radius: 8px;
+    background: repeating-linear-gradient(135deg, var(--steel-soft), var(--steel-soft) 6px, var(--paper) 6px, var(--paper) 12px);
+    border: 1px solid var(--line);
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--steel);
+  }
+  .receipt-thumb svg { width: 22px; height: 22px; }
+  .receipt-info { flex: 1; min-width: 0; }
+  .receipt-info-title { font-size: 13.5px; font-weight: 600; }
+  .receipt-info-sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+
+  .field-group {
+    margin-top: 18px;
+  }
+  .field-label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 7px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .field-box {
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .field-box:focus-within { border-color: var(--steel); }
+  .field-box input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    width: 100%;
+  }
+  .field-box.amount input { font-size: 22px; }
+  .field-prefix { color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 15px; }
+  .field-box input[type="text"] { font-family: 'IBM Plex Sans TC', sans-serif; font-weight: 500; font-size: 16px; }
+  .field-box input[type="date"] { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 16px; }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    padding: 9px 13px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    color: var(--ink);
+  }
+  .chip.active {
+    border-color: var(--good);
+    background: var(--good-soft);
+    color: var(--good);
+    font-weight: 600;
+  }
+  .chip.active.low-conf {
+    border-color: var(--alert);
+    background: var(--alert-soft);
+    color: var(--alert);
+  }
+
+  .auto-note {
+    margin-top: 9px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.5;
+  }
+  .auto-note.warn { color: var(--alert); }
+  .auto-note svg { width: 13px; height: 13px; flex: none; }
+
+  .correction-note {
+    margin-top: 9px;
+    background: var(--steel-soft);
+    color: var(--steel);
+    border-radius: 9px;
+    padding: 9px 11px;
+    font-size: 11.5px;
+    line-height: 1.55;
+    display: none;
+  }
+  .correction-note.show { display: block; animation: popIn 0.25s ease; }
+
+  .case-select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+  .case-select-text { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; }
+  .case-select-text small { display: block; font-family: 'IBM Plex Sans TC', sans-serif; color: var(--ink-soft); font-weight: 400; font-size: 10.5px; margin-top: 2px; }
+
+  .threshold-banner {
+    margin-top: 16px;
+    background: var(--alert-soft);
+    color: var(--alert);
+    border-radius: 12px;
+    padding: 11px 13px;
+    font-size: 12px;
+    line-height: 1.6;
+    display: none;
+  }
+  .threshold-banner.show { display: block; }
+
+  /* ---------- Signature ---------- */
+  .field-hint { font-weight: 400; color: var(--ink-soft); font-size: 11px; }
+  .signature-box {
+    border: 1.5px dashed var(--line-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .signature-box.signed {
+    border-style: solid;
+    border-color: var(--good);
+    background: var(--good-soft);
+  }
+  .signature-box-icon {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-soft);
+    flex: none;
+  }
+  .signature-box.signed .signature-box-icon {
+    background: var(--surface);
+    padding: 2px;
+  }
+  .signature-box-icon svg { width: 18px; height: 18px; }
+  .signature-box-icon img { width: 100%; height: 100%; object-fit: contain; }
+  .signature-box-text { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .signature-box-sub { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+  .signature-box.signed .signature-box-text { color: var(--good); font-weight: 600; }
+
+  .sig-overlay {
+    position: fixed; inset: 0;
+    background: var(--paper);
+    z-index: 70;
+    display: none;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sig-overlay.show { display: flex; }
+  .sig-header {
+    padding: 14px 16px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+  }
+  .sig-header-title { font-size: 14.5px; font-weight: 700; }
+  .sig-header-sub { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+  .sig-close {
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .sig-close svg { width: 15px; height: 15px; }
+  .sig-canvas-wrap {
+    flex: 1;
+    margin: 16px;
+    border-radius: 14px;
+    border: 1.5px dashed var(--line-strong);
+    background: #FFFFFF;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .sig-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+  .sig-baseline {
+    position: absolute;
+    left: 20px; right: 20px; bottom: 34%;
+    border-bottom: 1.5px dashed #D8D4C8;
+    pointer-events: none;
+  }
+  .sig-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #B7B2A2;
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .sig-footer {
+    padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    gap: 10px;
+  }
+
+  .review-footer {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .btn-submit {
+    width: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 15.5px;
+    padding: 16px;
+    border-radius: 14px;
+  }
+  :root[data-theme="dark"] .btn-submit { background: var(--hazard); color: var(--hazard-ink); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-submit { background: var(--hazard); color: var(--hazard-ink); } }
+
+  .back-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px 2px;
+  }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex: none;
+  }
+  .back-btn svg { width: 17px; height: 17px; }
+  .screen-title { font-size: 15.5px; font-weight: 700; }
+
+  /* ---------- Bottom sheet ---------- */
+  .sheet-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 100%);
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    z-index: 51;
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    transition: transform 0.28s cubic-bezier(.2,.8,.3,1);
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+  }
+  .sheet.show { transform: translate(-50%, 0); }
+  .sheet-handle { width: 36px; height: 4px; background: var(--line-strong); border-radius: 4px; margin: 8px auto 14px; }
+  .sheet-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; padding: 0 4px; }
+  .sheet-sub { font-size: 11.5px; color: var(--ink-soft); padding: 0 4px; margin-bottom: 14px; }
+  .case-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--line);
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .case-option.selected { border-color: var(--good); background: var(--good-soft); }
+  .case-option-text { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; font-weight: 600; }
+  .case-option-text small { display: block; font-family: 'IBM Plex Sans TC', sans-serif; color: var(--ink-soft); font-weight: 400; font-size: 10.5px; margin-top: 2px; }
+  .check-circle { width: 18px; height: 18px; flex: none; color: var(--good); opacity: 0; }
+  .case-option.selected .check-circle { opacity: 1; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%) translateY(10px);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+    z-index: 60;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    max-width: calc(480px - 40px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .toast svg { width: 16px; height: 16px; color: var(--good); flex: none; }
+
+  .wifi-row { display:flex; align-items:center; gap:8px; padding:7px 18px; font-size:11.5px; color:var(--ink-soft); border-top:1px solid var(--line); }
+  .wifi-row input { -webkit-appearance:checkbox; appearance:auto; width:16px; height:16px; margin:0; }
+  .entry-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .mini-btn { border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 9px; font-size:11px; font-weight:600; cursor:pointer; }
+  .mini-btn.danger { color:var(--alert); border-color:var(--alert); }
+  .export-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 18px; border-top:1px solid var(--line); color:var(--ink-soft); }
+  .rq-pick { -webkit-appearance:checkbox; appearance:auto; width:24px; height:24px; margin:0 4px 0 0; flex:none; }
+  #historySheet:not(.show) { visibility: hidden; }  /* 收起時不可見、也不能用鍵盤點到 */
+  .history-step { padding:8px 0; border-bottom:1px solid var(--line); font-size:16px; line-height:1.5; }
+  .history-step small { display:block; color:var(--ink-soft); }
+  .export-row input { border:1.5px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); padding:6px 8px; min-height:44px; font-size:16px; }
+
+  ::selection { background: var(--hazard); color: var(--hazard-ink); }
+
+  /* ---------- F2 現場可讀性：戶外單手，文字 ≥16px、可點項目 ≥44px ---------- */
+  .brand-sub, #brandUserLabel, .case-pill-text, .case-pill-text small, #boundCaseLabel, .net-strip, #netLabel, .net-strip-hint,
+  .wifi-row, .section-label, .month-total, .entry *, .tag, .field-label, .field-hint, .field-prefix, .auto-note, .correction-note,
+  .receipt-info-title, .receipt-info-sub, .case-select-text, .case-select-text small, .signature-box-text, .signature-box-sub,
+  .chip, .sheet-title, .sheet-sub, .case-option-text, .case-option-text small, .screen-title, .btn, .more-toggle, .mini-btn,
+  .threshold-banner, .sig-header-sub, #toastText { font-size: 16px !important; }
+  .back-btn { width: 44px; height: 44px; }
+  .brand-user, .case-pill, .net-strip, .chip, .case-select, .mini-btn, .wifi-row { min-height: 44px; }
+  .brand-user, .net-strip, .wifi-row, .case-pill { display: flex; align-items: center; }
+  .field-box input, .field-box select { min-height: 44px; font-size: 18px; }
+  .entry-amount, .entry-store { font-size: 17px !important; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 裝置綁定畫面（首次開啟或金鑰失效時） ===== -->
+  <div id="screen-bind" class="screen" style="display:none;">
+    <div class="onboard">
+      <div class="onboard-badge">$</div>
+      <div class="onboard-title">綁定這支手機</div>
+      <div class="onboard-sub">請輸入管理員交給你的裝置金鑰。金鑰只會存在這支手機，用來證明這是公司核准的裝置。</div>
+      <div class="field-box"><input type="text" id="bindKey" placeholder="ek_…" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
+      <div class="pin-error" id="bindError" style="margin-top:10px;"></div>
+      <button class="onboard-manual-btn" style="padding:14px; margin-top:4px;" onclick="submitBind()">綁定</button>
+    </div>
+  </div>
+
+  <!-- ===== 配對中／配對失敗（點連結或掃 QR 後） ===== -->
+  <div id="screen-pair" class="screen" style="display:none;">
+    <div class="onboard">
+      <div class="onboard-badge">$</div>
+      <div class="onboard-title" id="pairTitle">正在設定這支手機…</div>
+      <div class="onboard-sub" id="pairMsg">請稍等，不需要輸入任何東西。</div>
+    </div>
+  </div>
+
+  <!-- ===== 送出後結果卡（全螢幕） ===== -->
+  <div id="screen-result" class="screen" style="display:none;">
+    <div class="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="result-actions" id="resultActions"></div>
+    </div>
+  </div>
+
+  <!-- ===== 設定頁 ===== -->
+  <div id="screen-settings" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l-8 8 8 8"/></svg>
+      </div>
+      <div class="back-title">設定</div>
+    </div>
+    <div class="onboard">
+      <label class="wifi-row"><input type="checkbox" id="pinEnabled" onchange="onPinToggle()"> 開啟 PIN（選用：每次開啟要輸入 4 位數）</label>
+      <div class="onboard-sub">PIN 只是這支手機本機的解鎖，不是必要的。手機遺失請通知管理員撤銷。</div>
+      <div id="adminTools" style="display:none; margin-top:18px;">
+        <button class="btn btn-secondary" id="unblockBtn" onclick="unblockLogins()">解除登入封鎖</button>
+        <div class="onboard-sub">有人打錯太多次時，其他人可能暫時無法綁定新手機；按這裡立即解除（只有管理員看得到）。</div>
+        <div class="onboard-sub" style="margin-top:14px;font-weight:600;">裝置與權限（管理員最少 1 位、最多 2 位）</div>
+        <div id="adminDevices"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PIN Screen (setup / unlock) ===== -->
+  <div id="screen-pin" class="screen" style="display:none;">
+    <div class="onboard" style="align-items:center; text-align:center;">
+      <div class="onboard-badge" id="pinAvatar">王</div>
+      <div class="onboard-title" id="pinTitle">輸入 PIN</div>
+      <div class="onboard-sub" id="pinSub" style="margin-bottom:14px;">為此身份設定 4 位數 PIN</div>
+      <div class="pin-dots" id="pinDots">
+        <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+      </div>
+      <div class="pin-error" id="pinError"></div>
+      <div class="pin-keypad" id="pinKeypad">
+        <button class="pin-key" onclick="pinDigit('1')">1</button>
+        <button class="pin-key" onclick="pinDigit('2')">2</button>
+        <button class="pin-key" onclick="pinDigit('3')">3</button>
+        <button class="pin-key" onclick="pinDigit('4')">4</button>
+        <button class="pin-key" onclick="pinDigit('5')">5</button>
+        <button class="pin-key" onclick="pinDigit('6')">6</button>
+        <button class="pin-key" onclick="pinDigit('7')">7</button>
+        <button class="pin-key" onclick="pinDigit('8')">8</button>
+        <button class="pin-key" onclick="pinDigit('9')">9</button>
+        <button class="pin-key pin-key-ghost">·</button>
+        <button class="pin-key" onclick="pinDigit('0')">0</button>
+        <button class="pin-key pin-key-back" onclick="pinBackspace()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H8l-6 7 6 7h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><path d="M14 10l4 4M18 10l-4 4"/></svg>
+        </button>
+      </div>
+      <div class="pin-alt-link" id="pinAltLink" onclick="pinAlt()">忘記 PIN？</div>
+    </div>
+  </div>
+
+  <!-- ===== Home Screen ===== -->
+  <div id="screen-home" class="screen">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-title">支出申報</div>
+          <div class="brand-user" onclick="openSettings()">
+            <span class="brand-sub" id="brandUserLabel">一六國際 · 現場人員</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l8 8-8 8"/></svg>
+          </div>
+        </div>
+        <div class="case-pill" onclick="openCaseSheet()">
+          <span class="case-dot"></span>
+          <span class="case-pill-text" id="boundCaseLabel">UY2301<small>目前案件</small></span>
+        </div>
+      </div>
+      <div class="net-strip" id="netStrip" onclick="syncNow()">
+        <span class="net-dot" id="netDot"></span>
+        <span id="netLabel">線上 · 資料即時同步</span>
+        <span class="net-strip-hint">（點一下立即同步）</span>
+      </div>
+      <div class="wifi-row" id="reviewBar" style="display:none; justify-content:space-between;">
+        <span id="reviewBarText">審核</span>
+        <button class="mini-btn" onclick="openReviewQueue()">開啟審核清單</button>
+      </div>
+      <label class="wifi-row"><input type="checkbox" id="wifiOnly" onchange="onWifiToggle()"> 僅 Wi‑Fi 自動上傳（省行動網路流量）</label>
+    </div>
+
+    <div class="section-label">
+      <span>本月申報</span>
+      <span class="month-total" id="monthTotal">NT$ 0</span>
+    </div>
+
+    <div class="entry-list" id="entryList"></div>
+  </div>
+
+  <input type="file" id="capCamera" accept="image/*" capture="environment" hidden onchange="onReceiptPicked(this)">
+  <input type="file" id="capAlbum" accept="image/*" hidden onchange="onReceiptPicked(this)">
+  <div class="action-bar" id="homeActionBar">
+    <button class="btn btn-primary" onclick="startCapture('photo')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.6A2 2 0 0 1 9.85 3.4h4.3a2 2 0 0 1 1.75 1l.9 1.6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="12.5" r="3.6"/></svg>
+      拍收據
+    </button>
+    <button class="btn btn-secondary" onclick="startCapture('album')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><path d="M3.5 15.5 8 11l3 3 4-4.5 5.5 6"/></svg>
+      從相簿選
+    </button>
+    <button class="btn btn-secondary" onclick="startNoReceipt()">
+      沒有收據
+    </button>
+  </div>
+
+  <!-- ===== 審核清單（reviewer／admin） ===== -->
+  <div id="screen-reviewq" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="screen-title">審核清單</div>
+    </div>
+    <div class="wifi-row" style="gap:8px;">
+      <button class="mini-btn" id="rqHeld" onclick="loadReviewQueue('held')">待處理</button>
+      <button class="mini-btn" id="rqSampled" onclick="loadReviewQueue('sampled')">自動核准・抽查</button>
+      <button class="mini-btn" id="rqDone" onclick="loadReviewQueue('done')">已處理</button>
+    </div>
+    <div class="export-row">
+      <span>申報日期</span>
+      <input type="date" id="exportFrom" aria-label="匯出開始日期">
+      <span>至</span>
+      <input type="date" id="exportTo" aria-label="匯出結束日期">
+      <button class="mini-btn" id="exportBtn" onclick="exportCsv()">匯出 CSV（給會計）</button>
+      <button class="mini-btn" id="exportEventsBtn" onclick="exportCsv('events')">匯出處理紀錄</button>
+    </div>
+    <div class="export-row" id="bulkRow">
+      <button class="mini-btn" id="rqSelectAll" onclick="selectAllPicks()">全選</button>
+      <button class="mini-btn" id="bulkApproveBtn" onclick="bulkApprove()">核准勾選的申報</button>
+    </div>
+    <div class="entry-list" id="reviewList"></div>
+  </div>
+
+  <!-- ===== Processing Screen ===== -->
+  <div id="screen-processing" class="screen" style="display:none;">
+    <div class="back-row"><div style="width:34px"></div></div>
+    <div class="processing">
+      <div class="processing-ring"></div>
+      <div>
+        <div class="processing-text" id="processingText">辨識單據中…</div>
+        <div class="processing-sub">擷取金額 · 店家 · 日期</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Review Screen ===== -->
+  <div id="screen-review" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="screen-title">確認申報內容</div>
+    </div>
+
+    <div class="review-scroll">
+
+      <div class="receipt-preview" id="receiptPreview">
+        <div class="receipt-thumb" id="receiptThumb">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/></svg>
+        </div>
+        <div class="receipt-info">
+          <div class="receipt-info-title" id="receiptTypeLabel">統一發票</div>
+          <div class="receipt-info-sub" id="receiptTypeSub">已自動辨識，請確認以下內容</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">金額</div>
+        <div class="field-box amount">
+          <span class="field-prefix">NT$</span>
+          <input type="number" id="fieldAmount" inputmode="numeric" value="0" oninput="onAmountChange()">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">店家</div>
+        <div class="field-box">
+          <input type="text" id="fieldStore" value="">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">工程案件</div>
+        <div class="case-select" onclick="openCaseSheet(true)">
+          <span class="case-select-text" id="reviewCaseLabel">UY2301<small>點一下可更換</small></span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="threshold-banner" id="thresholdBanner"></div>
+
+      <button type="button" class="btn btn-secondary more-toggle" id="moreToggle" onclick="toggleMore()">更多選項</button>
+      <div id="moreOptions" style="display:none;">
+      <div class="field-group" style="display:flex; gap:12px;">
+        <div style="flex:1;">
+          <div class="field-label">支出日期</div>
+          <div class="field-box"><input type="date" id="fieldDate"></div>
+        </div>
+        <div style="flex:1;">
+          <div class="field-label">申報日期</div>
+          <div class="field-box" style="opacity:0.6;"><input type="date" id="fieldReportDate" disabled></div>
+        </div>
+      </div>
+
+      <div class="field-group" id="docTypeGroup" style="display:none;">
+        <div class="field-label">單據類型</div>
+        <div class="chip-row" id="docTypeChips"></div>
+        <div class="auto-note" id="docTypeNote"></div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">
+          <span>用途</span>
+        </div>
+        <div class="chip-row" id="categoryChips"></div>
+        <div class="auto-note" id="categoryAutoNote"></div>
+        <div class="correction-note" id="correctionNote"></div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label"><span>廠商簽名 <span class="field-hint">選填，如油罐車、供應商送貨單</span></span></div>
+        <div class="signature-box" id="signatureBox" onclick="openSignaturePad()">
+          <div class="signature-box-icon" id="signatureBoxIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5l1.6-4.6L14.9 2.6a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.1 16.4 3 18z"/><path d="M3 21h18"/></svg>
+          </div>
+          <div>
+            <div class="signature-box-text" id="signatureBoxText">點此請廠商簽名</div>
+            <div class="signature-box-sub" id="signatureBoxSub">確認交付數量或到貨內容</div>
+          </div>
+        </div>
+      </div>
+
+      </div>
+
+    </div>
+
+    <div class="review-footer">
+      <button class="btn btn-submit" onclick="submitEntry()">送出申報</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Signature overlay -->
+<div class="sig-overlay" id="sigOverlay">
+  <div class="sig-header">
+    <div>
+      <div class="sig-header-title">廠商簽名</div>
+      <div class="sig-header-sub" id="sigHeaderSub">請將手機交給廠商，於下方簽名</div>
+    </div>
+    <div class="sig-close" onclick="cancelSignature()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </div>
+  </div>
+  <div class="sig-canvas-wrap" id="sigCanvasWrap">
+    <div class="sig-baseline"></div>
+    <div class="sig-placeholder" id="sigPlaceholder">手指或觸控筆簽名</div>
+    <canvas id="sigCanvas"></canvas>
+  </div>
+  <div class="sig-footer">
+    <button class="btn btn-secondary" style="flex:1" onclick="clearSignature()">清除</button>
+    <button class="btn btn-primary" style="flex:1.5" onclick="confirmSignature()">確認簽名</button>
+  </div>
+</div>
+
+<!-- Voucher viewer -->
+<div class="voucher-overlay" id="voucherOverlay" onclick="closeVoucherViewer(event)">
+  <img id="voucherImg" src="" alt="簽收單">
+  <div class="voucher-hint">金額、日期、工程案件與簽名已合併存證於同一張簽收單</div>
+  <button class="voucher-close" onclick="closeVoucherViewer(event)">關閉</button>
+</div>
+
+<!-- Case bottom sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop" onclick="closeCaseSheet()"></div>
+<div class="sheet" id="caseSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">選擇案件</div>
+  <div class="sheet-sub">最近使用的排在前面</div>
+  <div id="caseOptions"></div>
+</div>
+
+<!-- 處理紀錄 -->
+<div class="sheet-backdrop" id="historyBackdrop" onclick="closeHistory()"></div>
+<div class="sheet" id="historySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="historyTitle">處理紀錄</div>
+  <div id="historySteps" style="max-height:60vh; overflow-y:auto;"></div>
+  <button class="btn btn-secondary" style="width:100%; margin-top:12px; min-height:48px;" onclick="closeHistory()">關閉</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
+  <span id="toastText"></span>
+</div>
+
+<script src="sync.js"></script>
+<script>
+// ---------------- Server sync config ----------------
+// 伺服器位址：本頁由後端 /pwa 同源提供時留空；改用 Tailscale 時填入，例如 'http://100.x.y.z:8000'
+// （跨來源時，後端 settings.yaml 的 cors_allowed_origins 必須包含本頁的來源）
+const SERVER_URL = '';
+ExpenseSync.configure({ SERVER_URL, onFlush: onSyncFlush });
+
+// ---------------- Demo data ----------------
+const CASES = [
+  { company: 'UY2301', owner: 'CPC-2026-042', note: '42吋海管 PIT 計畫' },
+  { company: 'UY2505', owner: 'CPC-2026-051', note: '陸管腐蝕評估' },
+  { company: 'UY2510', owner: 'CPC-2025-118', note: '閥室維護工程' },
+];
+let boundCaseIndex = 0;
+let reviewCaseIndex = 0;
+let caseSheetContext = 'bind'; // 'bind' = home pill, 'review' = inside review screen
+
+const CATEGORIES = ['五金材料', '交通油料', '工具租賃', '餐飲雜支', '待分類'];
+
+// classifier: keyword -> {category, confidence}
+function classify(storeName) {
+  const s = storeName;
+  if (/五金|鐵材|工具行|螺絲/.test(s)) return { category: '五金材料', confidence: 'high' };
+  if (/加油|中油|台塑|全國加油/.test(s)) return { category: '交通油料', confidence: 'high' };
+  if (/租賃|機具/.test(s)) return { category: '工具租賃', confidence: 'high' };
+  if (/超商|檳榔|小吃|便當/.test(s)) return { category: '餐飲雜支', confidence: 'mid' };
+  return { category: '待分類', confidence: 'low' };
+}
+
+let selectedDocType = '統一發票';   // 有照片時由使用者選擇；送出後由後端自動辨識 QR
+
+let entries = [
+  { store: '永昌五金行', amount: 620, category: '五金材料', case: CASES[0], date: daysAgo(1), type: '統一發票', status: 'ok' },
+  { store: '中油 二仁溪站', amount: 980, category: '交通油料', case: CASES[0], date: daysAgo(2), type: '統一發票', status: 'ok' },
+  { store: '現場零星採買（沒有收據）', amount: 150, category: '待分類', case: CASES[0], date: daysAgo(3), type: '無單據', status: 'ok' },
+];
+
+let currentReceipt = null; // receipt being reviewed
+let correctionMade = false;
+let autoCategory = '';     // 系統自動判斷的分類（送出時一併回報，供後端記錄使用者修正）
+let signatureDataURL = null;
+let sigCtx = null, sigDrawing = false, sigHasStroke = false;
+
+// ---------------- Identity ----------------
+const USER_KEY = 'expense_demo_user';
+const PIN_KEY = 'expense_demo_pins';
+let currentUser = null;
+
+function loadUser() {
+  try { return localStorage.getItem(USER_KEY); } catch (err) { return null; }
+}
+function saveUser(name) {
+  try { localStorage.setItem(USER_KEY, name); } catch (err) { /* storage unavailable */ }
+}
+function loadPins() {
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) || '{}'); } catch (err) { return {}; }
+}
+function savePin(name, pin) {
+  try {
+    const pins = loadPins();
+    pins[name] = pin;
+    localStorage.setItem(PIN_KEY, JSON.stringify(pins));
+  } catch (err) { /* storage unavailable — PIN only holds for this session */ }
+}
+function initials(name) { return name.slice(-2); }
+
+// 姓名一律來自伺服器的裝置名稱（沒有選姓名畫面）
+async function loginFromServer(skipPin) {
+  let name = loadUser() || '現場人員';
+  if (skipPin || ExpenseSync.autoAllowed()) { // 行動網路 + 僅 Wi‑Fi 策略時不連線，沿用已存的姓名
+    try {
+      const r = await api('/api/v1/me');
+      if (r.status === 200) name = (await r.json()).name || name;
+    } catch (e) { /* 離線：沿用已存的姓名 */ }
+  }
+  if (!skipPin && loadPins()[name]) chooseIdentity(name); else finishLogin(name);
+}
+
+// ---------------- PIN flow ----------------
+let pinMode = 'setup';      // 'setup' | 'unlock'
+let pinStage = 1;           // setup: 1 = first entry, 2 = confirm
+let pinBuffer = '';
+let pinFirstEntry = '';
+let pendingIdentity = null;
+let pinContext = 'unlock';  // 'unlock'（開啟 App 時）| 'settings'（從設定頁開啟 PIN）
+
+function openSettings() {
+  document.getElementById('pinEnabled').checked = !!(currentUser && loadPins()[currentUser]);
+  document.getElementById('adminTools').style.display = myRole === 'admin' ? 'block' : 'none';  // 只是隱藏；伺服器端另有角色檢查
+  if (myRole === 'admin') loadAdminDevices();
+  showScreen('screen-settings');
+}
+const ROLE_LABEL = { submitter: '申報人', reviewer: '審核人員', admin: '管理員' };
+async function loadAdminDevices() {
+  const box = document.getElementById('adminDevices');
+  let rows = [];
+  try {
+    const r = await api('/api/v1/admin/devices');
+    if (!r.ok) return;
+    rows = await r.json();
+  } catch (e) { showToast('連不上伺服器'); return; }
+  box.textContent = '';
+  rows.forEach(d => {  // 名稱一律用 textContent，不經 innerHTML
+    const div = document.createElement('div');
+    div.className = 'admin-dev entry-actions';
+    const label = document.createElement('span');
+    label.textContent = `${d.name}　${ROLE_LABEL[d.role] || d.role}${d.is_me ? '（我）' : ''}`;
+    div.appendChild(label);
+    const btn = (text, fn) => { const b = document.createElement('button'); b.className = 'mini-btn'; b.textContent = text; b.onclick = fn; div.appendChild(b); };
+    if (d.role !== 'admin') {
+      btn('設為管理員', () => setDeviceRole(d.id, 'admin'));
+      btn(d.role === 'reviewer' ? '改為申報人' : '改為審核人員', () => setDeviceRole(d.id, d.role === 'reviewer' ? 'submitter' : 'reviewer'));
+      btn('轉移給他', () => transferAdmin(d.id, d.name));
+    } else if (d.is_me) {
+      btn('我不當管理員了', () => setDeviceRole(d.id, 'reviewer', true));
+    } else {
+      const note = document.createElement('span');
+      note.className = 'onboard-sub';
+      note.textContent = '（另一位管理員：要拿掉請在主機上操作）';
+      div.appendChild(note);
+    }
+    box.appendChild(div);
+  });
+}
+function leftAdmin() {
+  myRole = 'reviewer';
+  try { localStorage.setItem('expense_role', myRole); } catch (e) { /* 略過 */ }
+  document.getElementById('adminTools').style.display = 'none';
+}
+async function adminPost(path, body) {
+  const r = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let detail = '';
+  try { detail = (await r.json()).detail || ''; } catch (e) { /* 略過 */ }
+  if (!r.ok) showToast(typeof detail === 'string' && detail ? detail : '操作失敗（' + r.status + '）');
+  return r.ok;
+}
+async function setDeviceRole(id, role, self = false) {
+  try {
+    if (!await adminPost('/api/v1/admin/role', { device_id: id, role })) return;
+    showToast('已變更角色');
+    if (self) leftAdmin(); else loadAdminDevices();
+  } catch (e) { showToast('連不上伺服器'); }
+}
+async function transferAdmin(id, name) {
+  if (!window.confirm(`確定把你的管理員權限轉給「${name}」？轉移後你會變成審核人員。`)) return;
+  try {
+    if (!await adminPost('/api/v1/admin/transfer', { device_id: id })) return;
+    showToast('已轉移管理員權限');
+    leftAdmin();
+  } catch (e) { showToast('連不上伺服器'); }
+}
+async function unblockLogins() {
+  try {
+    const r = await api('/api/v1/admin/unblock', { method: 'POST' });
+    if (!r.ok) { showToast(r.status === 403 ? '只有管理員可以解除' : '解除失敗，請稍後再試'); return; }
+    const n = (await r.json()).cleared;
+    showToast(n ? `已解除封鎖（${n} 個來源）` : '已解除（目前沒有被封鎖的來源）');
+  } catch (e) { showToast('連不上伺服器'); }
+}
+function onPinToggle() {
+  const box = document.getElementById('pinEnabled');
+  if (!currentUser) { box.checked = false; return; }
+  if (box.checked) {
+    pinContext = 'settings';
+    pendingIdentity = currentUser;
+    pinMode = 'setup'; pinStage = 1; pinFirstEntry = ''; pinBuffer = '';
+    document.getElementById('pinAvatar').textContent = initials(currentUser);
+    document.getElementById('pinError').textContent = '';
+    document.getElementById('pinTitle').textContent = '設定你的 PIN';
+    document.getElementById('pinSub').textContent = '請設定 4 位數 PIN';
+    document.getElementById('pinAltLink').textContent = '取消';
+    renderPinDots();
+    showScreen('screen-pin');
+  } else {
+    try {
+      const pins = loadPins();
+      delete pins[currentUser];
+      localStorage.setItem(PIN_KEY, JSON.stringify(pins));
+    } catch (err) { /* 略過 */ }
+    showToast('已關閉 PIN');
+  }
+}
+function pinAlt() {
+  if (pinContext === 'settings') { pinContext = 'unlock'; openSettings(); }
+  else showToast('忘記 PIN？請向管理員索取新的連結，重新設定這支手機。');
+}
+
+function chooseIdentity(name) {
+  pendingIdentity = name;
+  const pins = loadPins();
+  document.getElementById('pinAvatar').textContent = initials(name);
+  pinBuffer = '';
+  document.getElementById('pinError').textContent = '';
+  if (pins[name]) {
+    pinMode = 'unlock';
+    document.getElementById('pinTitle').textContent = '歡迎回來，' + name;
+    document.getElementById('pinSub').textContent = '輸入你的 4 位數 PIN 繼續';
+    document.getElementById('pinAltLink').textContent = '忘記 PIN？';
+  } else {
+    pinMode = 'setup';
+    pinStage = 1;
+    pinFirstEntry = '';
+    document.getElementById('pinTitle').textContent = '設定你的 PIN';
+    document.getElementById('pinSub').textContent = '第一次使用此身份，請設定 4 位數 PIN';
+    document.getElementById('pinAltLink').textContent = '取消';
+  }
+  renderPinDots();
+  showScreen('screen-pin');
+}
+
+function renderPinDots() {
+  const dots = document.querySelectorAll('#pinDots .pin-dot');
+  dots.forEach((d, i) => d.classList.toggle('filled', i < pinBuffer.length));
+}
+
+function pinDigit(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  renderPinDots();
+  if (pinBuffer.length === 4) setTimeout(processPinEntry, 160);
+}
+function pinBackspace() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  renderPinDots();
+}
+function pinFail(message) {
+  const wrap = document.getElementById('pinKeypad').closest('.onboard');
+  document.getElementById('pinError').textContent = message;
+  wrap.classList.remove('pin-shake'); void wrap.offsetWidth; wrap.classList.add('pin-shake');
+  pinBuffer = '';
+  renderPinDots();
+}
+
+function processPinEntry() {
+  if (pinMode === 'setup') {
+    if (pinStage === 1) {
+      pinFirstEntry = pinBuffer;
+      pinBuffer = '';
+      pinStage = 2;
+      document.getElementById('pinTitle').textContent = '再輸入一次確認';
+      document.getElementById('pinSub').textContent = '請重新輸入剛才設定的 PIN';
+      renderPinDots();
+      return;
+    }
+    // stage 2 — confirm
+    if (pinBuffer === pinFirstEntry) {
+      savePin(pendingIdentity, pinBuffer);
+      if (pinContext === 'settings') { pinContext = 'unlock'; showToast('已開啟 PIN'); openSettings(); }
+      else finishLogin(pendingIdentity);
+    } else {
+      pinStage = 1;
+      pinFirstEntry = '';
+      document.getElementById('pinTitle').textContent = '設定你的 PIN';
+      document.getElementById('pinSub').textContent = pinContext === 'settings' ? '請設定 4 位數 PIN' : '第一次使用此身份，請設定 4 位數 PIN';
+      pinFail('兩次輸入不一致，請重新設定');
+    }
+  } else {
+    // unlock
+    const pins = loadPins();
+    if (pinBuffer === pins[pendingIdentity]) {
+      finishLogin(pendingIdentity);
+    } else {
+      pinFail('PIN 錯誤，請再試一次');
+    }
+  }
+}
+
+function finishLogin(name) {
+  currentUser = name;
+  saveUser(name);
+  document.getElementById('brandUserLabel').textContent = '一六國際 · ' + name;
+  goHome();
+}
+
+// ---------------- Helpers ----------------
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0,10);
+}
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function fmtDate(s) {
+  const [y,m,d] = s.split('-');
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
+function fmtMoney(n) { return 'NT$ ' + n.toLocaleString('en-US'); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function iconForType(type) {
+  if (type === '交通油料') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V9l4-5h6l4 5v11"/><path d="M4 13h14"/><circle cx="8" cy="17" r="1.2"/><circle cx="15" cy="17" r="1.2"/></svg>`;
+  if (type === '五金材料') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7l3 3-8 8H6v-3z"/><path d="M17.5 3.5l3 3-2 2-3-3z"/></svg>`;
+  if (type === '工具租賃') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2.4"/><circle cx="17" cy="17" r="2.4"/><path d="M9.2 15.5 13 6h4"/><path d="M6 10h5"/></svg>`;
+  if (type === '無單據') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/></svg>`;
+}
+
+// ---------------- Render home ----------------
+function renderHome() {
+  const list = document.getElementById('entryList');
+  list.innerHTML = '';
+  let total = 0;
+  entries.forEach((e, i) => {
+    total += e.amount;
+    const div = document.createElement('div');
+    div.className = 'entry' + (e._new ? ' new' : '');
+    if (e.voucherImage) { div.style.cursor = 'pointer'; div.onclick = () => openVoucherViewer(e.voucherImage); }
+    const statusTag = e.status === 'failed'
+      ? `<span class="tag tag-review">${escapeHtml(failText(e))}</span>`
+      : e.status === 'waiting-wifi'
+      ? `<span class="tag tag-pending">${ExpenseSync.networkKind() === 'unsupported' ? '等 Wi‑Fi（請在 Wi‑Fi 下按「立即上傳」）' : '等 Wi‑Fi（省流量）'}</span>`
+      : e.status === 'rejected'
+      ? `<span class="tag tag-review">這張被退回：${escapeHtml(friendlyReasons(e.reviewReasons))}</span>`
+      : e.status === 'pending-sync'
+      ? '<span class="tag tag-pending">等待送出</span>'
+      : (e.status === 'review' ? '<span class="tag tag-review">審核中</span>' : '<span class="tag tag-ok">已送出</span>');
+    const actions = e.status === 'failed'
+      ? `<div class="entry-actions">${e.failStatus === 401 ? `<button class="mini-btn" onclick="rebindDevice(event)">重新綁定</button>` : ''}<button class="mini-btn" onclick="resendEntry('${e.clientId}', event)">重送</button><button class="mini-btn danger" onclick="deleteFailedEntry('${e.clientId}', event)">刪除</button></div>`
+      : e.status === 'waiting-wifi'
+      ? `<div class="entry-actions"><button class="mini-btn" onclick="forceUploadEntry('${e.clientId}', event)">本筆改用行動網路上傳</button></div>`
+      : '';
+    div.innerHTML = `
+      <div class="entry-icon">${iconForType(e.category === '待分類' && e.type === '無單據' ? '無單據' : e.category)}</div>
+      <div class="entry-body">
+        <div class="entry-top">
+          <div class="entry-store">${escapeHtml(e.store)}</div>
+          <div class="entry-amount">${fmtMoney(e.amount)}</div>
+        </div>
+        <div class="entry-meta">
+          <span class="tag tag-case">${escapeHtml(e.case.company)}</span>
+          <span class="tag tag-cat">${escapeHtml(e.category)}</span>
+          ${statusTag}
+          ${e.signed ? '<span class="tag tag-cat">已簽收</span>' : ''}
+          ${e.reporter ? `<span class="tag tag-user">${escapeHtml(e.reporter)}</span>` : ''}
+          <span class="entry-date">${fmtDate(e.date)}</span>
+        </div>
+        ${actions}
+      </div>`;
+    list.appendChild(div);
+    e._new = false;
+  });
+  document.getElementById('monthTotal').textContent = fmtMoney(total);
+  document.getElementById('boundCaseLabel').innerHTML = CASES[boundCaseIndex].company + '<small>目前案件</small>';
+}
+
+function openVoucherViewer(src) {
+  document.getElementById('voucherImg').src = src;
+  document.getElementById('voucherOverlay').classList.add('show');
+}
+function closeVoucherViewer(evt) {
+  if (evt) evt.stopPropagation();
+  document.getElementById('voucherOverlay').classList.remove('show');
+}
+
+// ---------------- Screen switching ----------------
+function showScreen(id) {
+  ['screen-bind','screen-pair','screen-result','screen-settings','screen-pin','screen-home','screen-reviewq','screen-processing','screen-review'].forEach(s => {
+    document.getElementById(s).style.display = (s === id) ? 'flex' : 'none';
+  });
+  document.getElementById('homeActionBar').style.display = (id === 'screen-home') ? 'flex' : 'none';
+}
+function goHome() { renderHome(); showScreen('screen-home'); }
+
+// ---------------- Capture flow ----------------
+function startCapture(source) {
+  // 開啟手機相機（photo）或相簿（album）；選好照片後由 onReceiptPicked 接手
+  document.getElementById(source === 'photo' ? 'capCamera' : 'capAlbum').click();
+}
+
+function onReceiptPicked(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // 讓同一張照片可以再次選取
+  if (!file) return;
+  if (currentReceipt && currentReceipt.previewUrl) URL.revokeObjectURL(currentReceipt.previewUrl);
+  currentReceipt = { type: 'photo', store: '', amount: 0, hasTax: true, isNoReceipt: false, file, previewUrl: URL.createObjectURL(file) };
+  openReview();
+}
+
+function startNoReceipt() {
+  currentReceipt = { type: 'none', store: '', amount: 0, hasTax: false, isNoReceipt: true };
+  openReview();
+}
+
+function openReview() {
+  toggleMore(false); // 每次進確認畫面，「更多選項」預設收起
+  correctionMade = false;
+  document.getElementById('correctionNote').classList.remove('show');
+  reviewCaseIndex = boundCaseIndex;
+  resetSignatureField();
+
+  const r = currentReceipt;
+  document.getElementById('fieldAmount').value = r.amount || '';
+  document.getElementById('fieldStore').value = r.store || '';
+  document.getElementById('fieldDate').value = todayStr();
+  document.getElementById('fieldReportDate').value = todayStr();
+
+  // receipt type display
+  const typeLabel = document.getElementById('receiptTypeLabel');
+  const typeSub = document.getElementById('receiptTypeSub');
+  const thumb = document.getElementById('receiptThumb');
+  if (r.isNoReceipt) {
+    typeLabel.textContent = '沒有收據';
+    typeSub.textContent = '請填寫店家、金額與用途';
+    thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></svg>`;
+  } else if (r.file) {
+    typeLabel.textContent = '已附單據照片';
+    typeSub.textContent = '送出後系統會自動辨識電子發票 QR；金額留空時以發票上的金額為準';
+    thumb.innerHTML = `<img src="${r.previewUrl}" alt="單據照片" style="width:100%;height:100%;object-fit:cover;border-radius:7px;">`;
+  } else if (r.hasTax) {
+    typeLabel.textContent = '統一發票';
+    typeSub.textContent = '已辨識統一編號，屬有效發票';
+    thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/></svg>`;
+  } else {
+    typeLabel.textContent = '收據';
+    typeSub.textContent = '未辨識統一編號，屬一般收據';
+    thumb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/><path d="M9 12h6M9 15h4" stroke-dasharray="1.5 2"/></svg>`;
+  }
+
+  // 單據類型（僅照片模式）
+  selectedDocType = '統一發票';
+  document.getElementById('docTypeGroup').style.display = r.file ? 'block' : 'none';
+  if (r.file) renderDocTypeChips();
+
+  // category chips
+  let cls;
+  if (r.isNoReceipt) {
+    cls = { category: '待分類', confidence: 'low' };
+  } else {
+    cls = classify(r.store);
+  }
+  renderCategoryChips(cls.category, cls.confidence);
+
+  document.getElementById('reviewCaseLabel').innerHTML = CASES[reviewCaseIndex].company + '<small>' + CASES[reviewCaseIndex].company + ' / ' + CASES[reviewCaseIndex].owner + '</small>';
+
+  checkThreshold();
+  showScreen('screen-review');
+}
+
+function renderDocTypeChips() {
+  const row = document.getElementById('docTypeChips');
+  row.innerHTML = '';
+  ['統一發票', '收據'].forEach(t => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (t === selectedDocType ? ' active' : '');
+    chip.textContent = t;
+    chip.onclick = () => { selectedDocType = t; renderDocTypeChips(); };
+    row.appendChild(chip);
+  });
+  document.getElementById('docTypeNote').textContent = selectedDocType === '統一發票'
+    ? '有電子發票 QR 時，系統會自動核對並可能自動核准。' : '收據沒有可驗證的 QR，會交由審核人員確認。';
+}
+
+let selectedCategory = '';
+function renderCategoryChips(auto, confidence) {
+  selectedCategory = auto;
+  autoCategory = auto;
+  const row = document.getElementById('categoryChips');
+  row.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (cat === selectedCategory ? ' active' + (confidence === 'low' && cat === auto ? ' low-conf' : '') : '');
+    chip.textContent = cat;
+    chip.onclick = () => selectCategory(cat, auto);
+    chip.dataset.cat = cat;
+    row.appendChild(chip);
+  });
+  const note = document.getElementById('categoryAutoNote');
+  if (confidence === 'high') {
+    note.className = 'auto-note';
+    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg> 系統依店家名稱自動判斷，如不正確請直接點選其他用途`;
+  } else if (confidence === 'mid') {
+    note.className = 'auto-note';
+    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg> 系統初步判斷，信心度中等，請確認一下`;
+  } else {
+    note.className = 'auto-note warn';
+    note.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg> 系統無法自動判斷，請手動選擇一個用途`;
+  }
+}
+function selectCategory(cat, autoCat) {
+  selectedCategory = cat;
+  document.querySelectorAll('#categoryChips .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.cat === cat);
+    c.classList.remove('low-conf');
+  });
+  const cnote = document.getElementById('correctionNote');
+  if (cat !== autoCat) {
+    correctionMade = true;
+    const storeName = document.getElementById('fieldStore').value || '此店家';
+    cnote.innerHTML = `已記下你的修正：<strong>${escapeHtml(storeName)}</strong> 系統原判斷為「${escapeHtml(autoCat)}」，已改為「${escapeHtml(cat)}」。同店家累積 3 次相同修正後，系統會提示更新自動判斷規則。`;
+    cnote.classList.add('show');
+  } else {
+    correctionMade = false;
+    cnote.classList.remove('show');
+  }
+}
+
+function onAmountChange() { checkThreshold(); }
+function toggleMore(open) {
+  const box = document.getElementById('moreOptions');
+  const show = open === undefined ? box.style.display === 'none' : open;
+  box.style.display = show ? 'block' : 'none';
+  document.getElementById('moreToggle').textContent = show ? '收起更多選項' : '更多選項';
+}
+function checkThreshold() {
+  const banner = document.getElementById('thresholdBanner');
+  const amt = parseInt(document.getElementById('fieldAmount').value || '0', 10);
+  if (currentReceipt && currentReceipt.isNoReceipt && amt > 1000) {
+    banner.textContent = `沒有收據的金額超過 NT$1,000，此筆會由審核人員確認`;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+// ---------------- Case sheet ----------------
+function openCaseSheet(fromReview) {
+  caseSheetContext = fromReview ? 'review' : 'bind';
+  const wrap = document.getElementById('caseOptions');
+  wrap.innerHTML = '';
+  CASES.forEach((c, i) => {
+    const activeIdx = caseSheetContext === 'review' ? reviewCaseIndex : boundCaseIndex;
+    const opt = document.createElement('div');
+    opt.className = 'case-option' + (i === activeIdx ? ' selected' : '');
+    opt.innerHTML = `
+      <span class="case-option-text">${c.company} / ${c.owner}<small>${c.note}</small></span>
+      <svg class="check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>`;
+    opt.onclick = () => selectCase(i);
+    wrap.appendChild(opt);
+  });
+  document.getElementById('sheetBackdrop').classList.add('show');
+  document.getElementById('caseSheet').classList.add('show');
+}
+function closeCaseSheet() {
+  document.getElementById('sheetBackdrop').classList.remove('show');
+  document.getElementById('caseSheet').classList.remove('show');
+}
+function selectCase(i) {
+  if (caseSheetContext === 'review') {
+    reviewCaseIndex = i;
+    document.getElementById('reviewCaseLabel').innerHTML = CASES[i].company + '<small>' + CASES[i].company + ' / ' + CASES[i].owner + '</small>';
+  } else {
+    boundCaseIndex = i;
+    document.getElementById('boundCaseLabel').innerHTML = CASES[i].company + '<small>目前案件</small>';
+  }
+  closeCaseSheet();
+}
+
+// ---------------- Submit ----------------
+function newClientId() {
+  // 每筆申報唯一的冪等鍵（與「案號」無關）：重送同一筆時後端不會重複入庫
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+async function dataUrlToBlob(dataUrl) {
+  return (await fetch(dataUrl)).blob();
+}
+
+async function submitEntry() {
+  const amount = parseInt(document.getElementById('fieldAmount').value || '0', 10);
+  const rawStore = document.getElementById('fieldStore').value.trim();
+  const store = rawStore || '（未命名店家）';
+  const date = document.getElementById('fieldDate').value;
+  const reportDate = document.getElementById('fieldReportDate').value;
+  const isReview = currentReceipt.isNoReceipt && amount > 1000;
+  const caseObj = CASES[reviewCaseIndex];
+  const typeLabel = currentReceipt.isNoReceipt ? '無單據' : (currentReceipt.file ? selectedDocType : (currentReceipt.hasTax ? '統一發票' : '收據'));
+  const amountBlank = !document.getElementById('fieldAmount').value.trim();
+
+  let voucherImage = null;
+  if (signatureDataURL) {
+    voucherImage = await buildVoucherImage({
+      amount, store, category: selectedCategory, date, reportDate,
+      caseCompany: caseObj.company, caseOwner: caseObj.owner,
+      type: typeLabel, signatureDataURL,
+    });
+  }
+
+  const clientId = newClientId();
+  const entry = {
+    store, amount, category: selectedCategory, case: caseObj, date,
+    type: typeLabel,
+    status: 'pending-sync', // 收到後端 HTTP 200 才會改成已記錄／待審核
+    signed: !!signatureDataURL,
+    voucherImage,
+    reporter: currentUser,
+    clientId,
+    _new: true,
+    _wasReview: isReview,
+    _signed: !!signatureDataURL,
+  };
+
+  try {
+    // 先寫進本機（IndexedDB）離線佇列，再嘗試送出；只有伺服器回 200 才會從佇列移除
+    await ExpenseSync.enqueueOnly({
+      fields: {
+        client_id: clientId,
+        case_no: caseObj.company,
+        owner_case_no: caseObj.owner,
+        doc_type: typeLabel,
+        employee: currentUser || '',
+        // 有照片且金額留空：交給伺服器以發票 QR 為準；其餘照舊
+        amount: (currentReceipt.file && amountBlank) ? '' : String(amount),
+        store: rawStore,
+        expense_date: date,
+        category: selectedCategory,
+        suggested_category: autoCategory,
+      },
+      receipt: currentReceipt.file || null,
+      signature: signatureDataURL ? await dataUrlToBlob(signatureDataURL) : null,
+      voucher: voucherImage ? await dataUrlToBlob(voucherImage) : null,
+      meta: {
+        store, amount, category: selectedCategory, caseIndex: reviewCaseIndex, date,
+        type: typeLabel, reporter: currentUser, signed: !!signatureDataURL, voucherImage, wasReview: isReview,
+      },
+    });
+  } catch (err) {
+    showToast('無法存入本機佇列，請重試');
+    return;
+  }
+
+  entries.unshift(entry);
+  pendingCount++;
+  showToast(!ExpenseSync.autoAllowed()
+    ? (ExpenseSync.networkKind() === 'unsupported' ? '已存檔，請在 Wi‑Fi 下按「立即上傳」' : '已存檔，連上 Wi‑Fi 後自動上傳')
+    : (isOnline ? '申報送出中…' : '已離線存檔，恢復連線後自動上傳'));
+  updateNetUI();
+  showResult(entry.clientId);
+  runSync();
+}
+
+// ---------------- Composite voucher image (data + signature, one file) ----------------
+function buildVoucherImage(data) {
+  return new Promise((resolve) => {
+    const W = 640, H = 900;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#D8D4C8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+
+    ctx.fillStyle = '#1B1F1D';
+    ctx.font = '600 26px "IBM Plex Sans TC", sans-serif';
+    ctx.fillText('支出憑證', 36, 58);
+    ctx.fillStyle = '#565F5A';
+    ctx.font = '400 13px "IBM Plex Mono", monospace';
+    ctx.fillText('一六國際 · 現場人員支出申報系統', 36, 80);
+
+    ctx.strokeStyle = '#D8D4C8';
+    ctx.beginPath(); ctx.moveTo(36, 98); ctx.lineTo(W - 36, 98); ctx.stroke();
+
+    const rows = [
+      ['金額', data.amount ? 'NT$ ' + Number(data.amount).toLocaleString('en-US') : '以發票上的金額為準'],
+      ['店家', data.store],
+      ['分類', data.category],
+      ['支出日期', data.date],
+      ['申報日期', data.reportDate],
+      ['案號（公司 / 業主）', data.caseCompany + ' / ' + data.caseOwner],
+      ['憑證類型', data.type],
+    ];
+    let y = 134;
+    rows.forEach(([label, val]) => {
+      ctx.fillStyle = '#565F5A';
+      ctx.font = '400 12.5px "IBM Plex Sans TC", sans-serif';
+      ctx.fillText(label, 36, y);
+      ctx.fillStyle = '#1B1F1D';
+      ctx.font = '600 17px "IBM Plex Mono", monospace';
+      ctx.fillText(String(val), 36, y + 23);
+      y += 56;
+    });
+
+    ctx.strokeStyle = '#D8D4C8';
+    ctx.beginPath(); ctx.moveTo(36, y + 6); ctx.lineTo(W - 36, y + 6); ctx.stroke();
+    y += 34;
+
+    ctx.fillStyle = '#565F5A';
+    ctx.font = '400 12.5px "IBM Plex Sans TC", sans-serif';
+    ctx.fillText('廠商簽名', 36, y);
+    y += 16;
+
+    const finish = () => {
+      ctx.fillStyle = '#B7B2A2';
+      ctx.font = '400 10.5px "IBM Plex Mono", monospace';
+      ctx.fillText('產生時間 ' + new Date().toLocaleString('zh-TW'), 36, H - 24);
+      resolve(canvas.toDataURL('image/png'));
+    };
+
+    if (data.signatureDataURL) {
+      const img = new Image();
+      img.onload = () => {
+        const sigW = W - 72, sigH = 200;
+        ctx.strokeStyle = '#D8D4C8';
+        ctx.strokeRect(36, y, sigW, sigH);
+        ctx.drawImage(img, 36, y, sigW, sigH);
+        finish();
+      };
+      img.onerror = finish;
+      img.src = data.signatureDataURL;
+    } else {
+      finish();
+    }
+  });
+}
+
+// ---------------- Offline queue + real sync (sync.js → POST /api/v1/submit) ----------------
+// 規則：HTTP 200 才清除本機佇列；5xx／網路錯誤／逾時（10 秒）保留並以遞增間隔重試；
+//       4xx 直接判定失敗、顯示錯誤訊息，不進重試佇列。
+let isOnline = navigator.onLine !== false;
+let syncStalled = false;   // 上一輪同步有項目因網路/5xx 留在佇列
+let pendingCount = 0;
+let heldKind = null;       // 因上傳策略（非 Wi‑Fi）而等待時的網路類型
+
+function entryFromMeta(clientId, meta, status, failMessage) {
+  if (!meta) return null;
+  return {
+    store: meta.store, amount: meta.amount, category: meta.category,
+    case: CASES[meta.caseIndex] || CASES[0], date: meta.date, type: meta.type,
+    status, failMessage, signed: meta.signed, voucherImage: meta.voucherImage,
+    reporter: meta.reporter, clientId, _new: false, _wasReview: meta.wasReview, _signed: meta.signed,
+  };
+}
+
+async function loadPendingQueue() {
+  try {
+    const [pend, failed] = await Promise.all([ExpenseSync.pendingItems(), ExpenseSync.failed()]);
+    const restored = [
+      ...pend.map(i => entryFromMeta(i.client_id, i.meta, 'pending-sync')),
+      ...failed.map(i => { const x = entryFromMeta(i.client_id, i.meta, 'failed', i.message); if (x) { x.failStatus = i.status; x.retryAfter = i.retryAfter; } return x; }),
+    ].filter(Boolean);
+    entries = [...restored, ...entries];
+    pendingCount = pend.length;
+    renderHome();
+    updateNetUI();
+    if (pend.length) runSync();
+  } catch (err) {
+    // IndexedDB unavailable — continue without persisted queue
+  }
+}
+
+function runSync() {
+  return ExpenseSync.flush().catch(() => {});
+}
+function syncNow() {
+  if (!pendingCount) { showToast('沒有等待送出的資料'); return; }
+  if (!ExpenseSync.autoAllowed()) { // 非 Wi‑Fi：使用者明確要求才上傳
+    const msg = ExpenseSync.networkKind() === 'unsupported'
+      ? '請確認目前已連上 Wi‑Fi，再上傳這些資料。要上傳嗎？'
+      : '目前不是 Wi‑Fi，上傳會使用行動網路流量。要繼續嗎？';
+    if (!confirm(msg)) return;
+    ExpenseSync.flush({ force: true });
+    return;
+  }
+  runSync();
+}
+
+function friendlyReasons(rs) {
+  // 伺服器的退回原因轉成現場看得懂的話（不顯示系統代碼）
+  const out = (rs || []).map(r => /^重複報銷/.test(r) ? '這張發票已經報過了' : r);
+  return out.join('；') || '請洽管理員';
+}
+let resultClientId = null;
+function showResult(id) { resultClientId = id; renderResult(); showScreen('screen-result'); }
+function closeResult() { resultClientId = null; goHome(); }
+function recaptureFromResult() { resultClientId = null; startCapture('photo'); }
+function renderResult() {
+  const e = entries.find(x => x.clientId === resultClientId);
+  if (!e) return;
+  const done = '<button class="btn btn-secondary" onclick="closeResult()">完成</button>';
+  let title, sub = '', actions = done;
+  if (e.status === 'ok') { title = '✓ 已送出'; }
+  else if (e.status === 'review') { title = '審核中'; sub = '審核人員確認中，通過後不用再做什麼'; }
+  else if (e.status === 'rejected') {
+    title = '這張被退回：' + friendlyReasons(e.reviewReasons);
+    actions = '<button class="btn btn-primary" onclick="recaptureFromResult()">重新拍一張</button>' + done;
+  } else if (e.status === 'failed') {
+    title = failText(e);
+    actions = `<button class="btn btn-primary" onclick="resendFromResult('${e.clientId}')">重送</button>` + done;
+  } else if (e.status === 'waiting-wifi' || !isOnline) {
+    title = '已存好';
+    sub = '連上 Wi‑Fi 會自動送出';
+    if (e.status === 'waiting-wifi') actions = `<button class="btn btn-primary" onclick="forceUploadEntry('${e.clientId}')">現在用行動網路送出</button>` + done;
+  } else { title = '傳送中…'; sub = '請稍等'; }
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultSub').textContent = sub;
+  document.getElementById('resultActions').innerHTML = actions;
+}
+function resendFromResult(id) { resendEntry(id).then(renderResult); renderResult(); }
+function failText(e) {
+  if (e.failStatus === 401) return '裝置未授權，請重新綁定';
+  if (e.failStatus === 429) return `請求太頻繁，請約 ${Math.max(1, Math.ceil((e.retryAfter || 60) / 60))} 分鐘後再送`;
+  return '送出失敗：' + (e.failMessage || '');
+}
+async function resendEntry(id, ev) {
+  if (ev) ev.stopPropagation();
+  const e = entries.find(x => x.clientId === id);
+  if (e) { e.status = 'pending-sync'; e.failMessage = ''; e.failStatus = null; pendingCount++; renderHome(); updateNetUI(); }
+  await ExpenseSync.retryFailed(id);
+}
+async function deleteFailedEntry(id, ev) {
+  if (ev) ev.stopPropagation();
+  if (!confirm('刪除這筆失敗的申報？刪除後無法復原。')) return;
+  await ExpenseSync.dismissFailed(id);
+  entries = entries.filter(x => x.clientId !== id);
+  renderHome();
+}
+function forceUploadEntry(id, ev) {
+  if (ev) ev.stopPropagation();
+  if (!confirm('這筆會使用行動網路上傳，要繼續嗎？')) return;
+  ExpenseSync.flush({ only: id });
+}
+function rebindDevice(ev) { if (ev) ev.stopPropagation(); showBind(); }
+function onWifiToggle() {
+  ExpenseSync.setPolicy(document.getElementById('wifiOnly').checked ? 'wifi_only' : 'any');
+  updateNetUI();
+  if (ExpenseSync.autoAllowed()) runSync();
+}
+
+// ---------------- 審核（reviewer／admin） ----------------
+let myRole = null;
+const isReviewer = () => myRole === 'reviewer' || myRole === 'admin';
+function api(path, opts = {}) {
+  return fetch(SERVER_URL + path, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + ExpenseSync.getKey() } });
+}
+function showReviewBar() { document.getElementById('reviewBar').style.display = isReviewer() ? 'flex' : 'none'; }
+function loadCachedRole() {
+  // 角色快取在手機上；非 Wi‑Fi 時不為了查角色而連線（遵守「行動網路下不傳輸」）
+  try { myRole = localStorage.getItem('expense_role'); } catch (e) { myRole = null; }
+  showReviewBar();
+}
+async function loadMe() {
+  if (!ExpenseSync.autoAllowed()) { loadCachedRole(); return; }
+  try {
+    const r = await api('/api/v1/me');
+    if (r.status !== 200) return;
+    myRole = (await r.json()).role;
+    try { localStorage.setItem('expense_role', myRole); } catch (e) { /* 略過 */ }
+    showReviewBar();
+    refreshReviewCount();
+  } catch (e) { loadCachedRole(); }
+}
+async function refreshReviewCount() {
+  if (!isReviewer() || !ExpenseSync.autoAllowed()) return;
+  try {
+    const r = await api('/api/v1/review/items?status=held');
+    if (r.ok) document.getElementById('reviewBarText').textContent = `審核：${(await r.json()).length} 筆待處理`;
+  } catch (e) { /* 離線 */ }
+}
+function openReviewQueue() {
+  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);  // 台北日期，與伺服器的申報日期一致
+  if (!document.getElementById('exportFrom').value) document.getElementById('exportFrom').value = today.slice(0, 8) + '01';
+  if (!document.getElementById('exportTo').value) document.getElementById('exportTo').value = today;
+  showScreen('screen-reviewq'); loadReviewQueue('held');
+}
+async function saveFile(filename, blob) {  // 存檔；其他打包版本可改寫這個函式
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return true;
+}
+function selectAllPicks() {
+  const boxes = [...document.querySelectorAll('.rq-pick')];
+  const on = boxes.some(b => !b.checked);
+  boxes.forEach(b => { b.checked = on; });
+}
+async function bulkApprove() {
+  const picked = [...document.querySelectorAll('.rq-pick:checked')];
+  if (!picked.length) { showToast('請先勾選要核准的申報'); return; }
+  const total = picked.reduce((s, b) => s + Number(b.dataset.amount || 0), 0);
+  if (!window.confirm(`確定核准勾選的 ${picked.length} 筆，共 ${fmtMoney(total)}？自己的申報會自動略過。`)) return;
+  try {
+    const r = await api('/api/v1/review/bulk-approve', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: picked.map(b => Number(b.dataset.id)) }) });
+    if (!r.ok) { showToast('核准失敗（' + r.status + '）'); return; }
+    const j = await r.json();
+    showToast(`已核准 ${j.approved.length} 筆` + (j.skipped.length ? `，略過 ${j.skipped.length} 筆（${[...new Set(j.skipped.map(s => s.reason))].join('、')}）` : ''));
+  } catch (e) { showToast('連不上伺服器'); }
+  loadReviewQueue('held');
+  refreshReviewCount();
+}
+async function showHistory(id) {
+  const box = document.getElementById('historySteps');
+  box.textContent = '讀取中…';
+  document.getElementById('historyBackdrop').classList.add('show');
+  document.getElementById('historySheet').classList.add('show');
+  try {
+    const r = await api(`/api/v1/review/${id}/history`);
+    if (!r.ok) { box.textContent = '無法取得處理紀錄'; return; }
+    const h = await r.json();
+    document.getElementById('historyTitle').textContent = `處理紀錄：${h.store || '（未填店家）'} ${fmtMoney(Number(h.amount) || 0)}`;
+    box.textContent = '';
+    h.steps.forEach(s => {  // 一律用 textContent，不經 innerHTML
+      const div = document.createElement('div');
+      div.className = 'history-step';
+      const what = document.createElement('div');
+      what.textContent = `${s.action}・${s.actor || ''}` + (s.to_status ? `：${s.from_status ? s.from_status + ' → ' : ''}${s.to_status}` : '') + (s.self_review ? '（自審）' : '');
+      const when = document.createElement('small');
+      when.textContent = s.time + (s.comment ? `　意見：${s.comment}` : '');
+      div.append(what, when);
+      box.appendChild(div);
+    });
+  } catch (e) { box.textContent = '連不上伺服器'; }
+}
+function closeHistory() {
+  document.getElementById('historyBackdrop').classList.remove('show');
+  document.getElementById('historySheet').classList.remove('show');
+}
+async function exportCsv(kind) {
+  const events = kind === 'events';
+  const f = document.getElementById('exportFrom').value, t = document.getElementById('exportTo').value;
+  if (f && t && f > t) { showToast('開始日期不能晚於結束日期'); return; }
+  try {
+    const q = new URLSearchParams();
+    if (f) q.set('from', f);
+    if (t) q.set('to', t);
+    const r = await api((events ? '/api/v1/export/events?' : '/api/v1/export?') + q.toString());
+    if (!r.ok) { showToast(r.status === 403 ? '只有審核人員或管理員可以匯出' : '匯出失敗（' + r.status + '）'); return; }
+    const text = await r.text();
+    // 加上 BOM，Excel 才會以 UTF-8 開啟，中文不會變亂碼
+    const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+    if (!await saveFile(`${events ? '處理紀錄' : '支出申報'}_${f || '最早'}_至_${t || '最新'}.csv`, blob)) return;
+    const n = Math.max(0, text.trim().split('\n').length - 1);
+    showToast(n ? `已匯出 ${n} 筆` : '這段期間沒有申報（已匯出空白表）');
+  } catch (e) { showToast('連不上伺服器'); }
+}
+async function loadReviewQueue(mode) {
+  document.getElementById('rqSampled').dataset.on = mode === 'sampled' ? '1' : '0';
+  document.getElementById('bulkRow').style.display = mode === 'held' ? 'flex' : 'none';
+  const list = document.getElementById('reviewList');
+  list.innerHTML = '';
+  let items = [];
+  try {
+    const r = await api(mode === 'held' ? '/api/v1/review/items?status=held'
+      : mode === 'done' ? '/api/v1/review/items?status=done' : '/api/v1/review/items?status=approved&sampled=1');
+    if (r.ok) items = await r.json();
+  } catch (e) { showToast('連不上伺服器'); }
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-hint">' + (mode === 'held' ? '目前沒有待處理的申報。' : mode === 'done' ? '還沒有已處理的申報。' : '目前沒有需要抽查的自動核准案件。') + '</div>';
+    return;
+  }
+  items.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    const files = ['receipt', 'signature', 'voucher'].filter(k => it.files && it.files[k])
+      .map(k => `<button class="mini-btn" onclick="viewFile(${Number(it.id)}, '${k}')">${{ receipt: '看收據', signature: '看簽名', voucher: '看憑證' }[k]}</button>`).join('');
+    const reasons = (it.review_reasons || []).join('；');
+    const doneTag = mode === 'done' ? `<span class="tag ${it.review_status === 'rejected' ? 'tag-review' : 'tag-ok'}">${it.review_status === 'rejected' ? '已退回' : '已核准'}・${escapeHtml(String(it.reviewed_by || '').startsWith('auto:') ? '自動' : (it.reviewed_by || ''))}</span>` : '';
+    const pick = mode === 'held' ? `<input type="checkbox" class="rq-pick" aria-label="勾選這筆" data-id="${Number(it.id)}" data-amount="${Number(it.amount) || 0}">` : '';
+    div.innerHTML = `${pick}<div class="entry-body">
+      <div class="entry-top"><div class="entry-store">${escapeHtml(it.store || '（未填店家）')}</div><div class="entry-amount">${fmtMoney(Number(it.amount) || 0)}</div></div>
+      <div class="entry-meta"><span class="tag tag-user">${escapeHtml(it.employee || '')}</span><span class="tag tag-cat">${escapeHtml(it.doc_type || '')}</span><span class="tag tag-case">${escapeHtml(it.case_no || '')}</span><span class="tag tag-cat">${escapeHtml(it.category || '')}</span><span class="entry-date">${escapeHtml(it.created_day || '')}</span>${doneTag}</div>
+      ${reasons ? `<div class="auto-note warn">${escapeHtml(reasons)}</div>` : ''}
+      <div class="entry-actions">${files}<button class="mini-btn" onclick="showHistory(${Number(it.id)})">處理紀錄</button>${mode === 'held' ? `<button class="mini-btn" onclick="decideItem(${Number(it.id)}, 'approve')">核准</button>` : ''}${mode !== 'done' ? `<button class="mini-btn danger" onclick="decideItem(${Number(it.id)}, 'reject')">退回</button>` : ''}</div></div>`;
+    list.appendChild(div);
+  });
+}
+async function viewFile(id, kind) {
+  try {
+    const r = await api(`/api/v1/files/${id}/${kind}`);
+    if (!r.ok) { showToast('無法取得圖片'); return; }
+    openVoucherViewer(URL.createObjectURL(await r.blob()));
+  } catch (e) { showToast('連不上伺服器'); }
+}
+async function decideItem(id, decision) {
+  let comment = '';
+  if (decision === 'reject') {
+    comment = (window.prompt('退回理由（必填）') || '').trim();
+    if (!comment) { showToast('退回必須填寫理由'); return; }
+  }
+  try {
+    const r = await api(`/api/v1/review/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, comment }) });
+    if (r.ok) showToast(decision === 'approve' ? '已核准' : '已退回');
+    else if (r.status === 403) showToast('不可審核自己的申報');
+    else if (r.status === 409) showToast('這筆已決定，無法再變更');
+    else showToast('操作失敗（' + r.status + '）');
+  } catch (e) { showToast('連不上伺服器'); }
+  loadReviewQueue(document.getElementById('rqSampled').dataset.on === '1' ? 'sampled' : 'held');  // 已處理分頁沒有決定按鈕
+  refreshReviewCount();
+}
+
+// ---------------- 裝置綁定 ----------------
+function showBind(msg) {
+  document.getElementById('bindError').textContent = msg || '';
+  document.getElementById('bindKey').value = '';
+  showScreen('screen-bind');
+}
+async function submitBind() {
+  const key = document.getElementById('bindKey').value.trim();
+  const err = (m) => { document.getElementById('bindError').textContent = m; };
+  if (!key) { err('請輸入金鑰'); return; }
+  try {
+    const r = await fetch(SERVER_URL + '/api/v1/rules', { headers: { Authorization: 'Bearer ' + key } });
+    if (r.status === 200) {
+      ExpenseSync.setKey(key);
+      showToast('已綁定這支手機');
+      loadMe();
+      loginFromServer(true); // 姓名來自伺服器；重新綁定不再重問 PIN
+    } else if (r.status === 401) err('金鑰無效、已過期或已被撤銷');
+    else if (r.status === 429) err('嘗試次數過多，請稍後再試');
+    else err('伺服器回應異常（' + r.status + '）');
+  } catch (e) { err('連不上伺服器，請確認網路'); }
+}
+
+// sync.js 每輪同步結束（含背景自動重試）都會呼叫
+function onSyncFlush(r) {
+  // 等待 Wi‑Fi 不是失敗：依上傳策略標示尚在佇列的項目
+  const waiting = !ExpenseSync.autoAllowed();
+  entries.forEach(e => { if (e.status === 'pending-sync' || e.status === 'waiting-wifi') e.status = waiting ? 'waiting-wifi' : 'pending-sync'; });
+  heldKind = waiting && r.remaining > 0 ? ExpenseSync.networkKind() : null;
+  Object.keys(r.results).forEach(id => {
+    const e = entries.find(x => x.clientId === id);
+    if (e) {
+      const srv = r.results[id] || {};
+      if (typeof srv.amount === 'number') e.amount = srv.amount;
+      // 以伺服器的審核結果為準：approved 已記錄、held 待審核、rejected 已退回（附原因）
+      e.status = srv.review_status === 'rejected' ? 'rejected' : (srv.review_status === 'held' || (!srv.review_status && srv.needs_review) ? 'review' : 'ok');
+      e.reviewReasons = srv.review_status === 'rejected' ? (srv.review_reasons || []) : [];
+    }
+  });
+  r.failed.forEach(f => {
+    const e = entries.find(x => x.clientId === f.client_id);
+    if (e) { e.status = 'failed'; e.failMessage = f.message; e.failStatus = f.status; e.retryAfter = f.retryAfter; }
+  });
+  pendingCount = r.remaining;
+  syncStalled = r.stalled; // 只有網路錯誤／5xx／逾時才算離線；單純還有新項目排隊不算
+  updateNetUI();
+  if (document.getElementById('screen-home').style.display !== 'none') renderHome();
+  if (document.getElementById('screen-result').style.display !== 'none') renderResult();
+
+  if (r.failed.length) {
+    showToast(failText({ failStatus: r.failed[0].status, retryAfter: r.failed[0].retryAfter, failMessage: r.failed[0].message }));
+  } else if (r.sent === 1) {
+    const e = entries.find(x => x.clientId === Object.keys(r.results)[0]);
+    if (e && e.status === 'rejected') showToast('這張被退回：' + friendlyReasons(e.reviewReasons));
+    else showToast(e && e._wasReview ? '已送出，審核中' : (e && e._signed ? '申報已送出（含簽收單）' : '申報已送出'));
+  } else if (r.sent > 1) {
+    showToast(`已同步 ${r.sent} 筆資料`);
+  }
+}
+
+function updateNetUI() {
+  const strip = document.getElementById('netStrip');
+  const label = document.getElementById('netLabel');
+  const offline = !isOnline || syncStalled || !!heldKind;
+  if (heldKind && pendingCount) {
+    strip.classList.add('offline');
+    label.textContent = heldKind === 'unsupported'
+      ? `等 Wi‑Fi · ${pendingCount} 筆 · 連上 Wi‑Fi 後按此處「立即上傳」`
+      : `等 Wi‑Fi（省流量）· ${pendingCount} 筆等待送出`;
+    return;
+  }
+  if (!offline) {
+    strip.classList.remove('offline');
+    label.textContent = pendingCount ? `線上 · 正在同步 ${pendingCount} 筆資料` : '線上 · 資料即時同步';
+  } else {
+    strip.classList.add('offline');
+    label.textContent = pendingCount ? `沒有網路 · ${pendingCount} 筆等待送出` : '離線 · 拍照與簽名仍可正常記錄';
+  }
+}
+
+window.addEventListener('online', () => { isOnline = true; updateNetUI(); runSync(); });
+window.addEventListener('offline', () => { isOnline = false; updateNetUI(); });
+
+// ---------------- Signature pad ----------------
+function resetSignatureField() {
+  signatureDataURL = null;
+  const box = document.getElementById('signatureBox');
+  box.classList.remove('signed');
+  document.getElementById('signatureBoxIcon').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5l1.6-4.6L14.9 2.6a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.1 16.4 3 18z"/><path d="M3 21h18"/></svg>`;
+  document.getElementById('signatureBoxText').textContent = '點此請廠商簽名';
+  document.getElementById('signatureBoxSub').textContent = '確認交付數量或到貨內容';
+}
+
+function setupCanvas() {
+  const canvas = document.getElementById('sigCanvas');
+  const wrap = document.getElementById('sigCanvasWrap');
+  const rect = wrap.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = rect.width * ratio;
+  canvas.height = rect.height * ratio;
+  sigCtx = canvas.getContext('2d');
+  sigCtx.scale(ratio, ratio);
+  sigCtx.lineWidth = 2.4;
+  sigCtx.lineCap = 'round';
+  sigCtx.lineJoin = 'round';
+  sigCtx.strokeStyle = '#1B1F1D';
+  sigHasStroke = false;
+  document.getElementById('sigPlaceholder').style.display = 'flex';
+
+  function pos(evt) {
+    const r = canvas.getBoundingClientRect();
+    const p = evt.touches ? evt.touches[0] : evt;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  }
+  function start(evt) {
+    evt.preventDefault();
+    sigDrawing = true;
+    sigHasStroke = true;
+    document.getElementById('sigPlaceholder').style.display = 'none';
+    const p = pos(evt);
+    sigCtx.beginPath();
+    sigCtx.moveTo(p.x, p.y);
+  }
+  function move(evt) {
+    if (!sigDrawing) return;
+    evt.preventDefault();
+    const p = pos(evt);
+    sigCtx.lineTo(p.x, p.y);
+    sigCtx.stroke();
+  }
+  function end() { sigDrawing = false; }
+
+  canvas.onpointerdown = start;
+  canvas.onpointermove = move;
+  canvas.onpointerup = end;
+  canvas.onpointerleave = end;
+  canvas.ontouchstart = start;
+  canvas.ontouchmove = move;
+  canvas.ontouchend = end;
+}
+
+function openSignaturePad() {
+  document.getElementById('sigOverlay').classList.add('show');
+  requestAnimationFrame(setupCanvas);
+}
+function clearSignature() {
+  setupCanvas();
+}
+function cancelSignature() {
+  document.getElementById('sigOverlay').classList.remove('show');
+}
+function confirmSignature() {
+  if (!sigHasStroke) {
+    showToast('請先簽名再確認');
+    return;
+  }
+  const canvas = document.getElementById('sigCanvas');
+  signatureDataURL = canvas.toDataURL('image/png');
+  const box = document.getElementById('signatureBox');
+  box.classList.add('signed');
+  document.getElementById('signatureBoxIcon').innerHTML = `<img src="${signatureDataURL}" alt="簽名">`;
+  document.getElementById('signatureBoxText').textContent = '廠商已簽名';
+  document.getElementById('signatureBoxSub').textContent = '點一下可重新簽名';
+  document.getElementById('sigOverlay').classList.remove('show');
+}
+
+function showToast(text) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastText').textContent = text;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------------- 配對連結（點連結或掃 QR） ----------------
+function pairFail(title, msg) {
+  document.getElementById('pairTitle').textContent = title;
+  document.getElementById('pairMsg').textContent = msg;
+  showScreen('screen-pair');
+}
+async function pairWithToken(token) {
+  showScreen('screen-pair');
+  try {
+    const r = await fetch(SERVER_URL + '/api/v1/pair', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+    if (r.status === 200) {
+      const j = await r.json();
+      ExpenseSync.setKey(j.key);
+      try { localStorage.removeItem('expense_role'); } catch (e) { /* 略過 */ }
+      finishLogin(j.name); // 姓名由伺服器的裝置名稱決定；PIN 為選用，預設不設
+      showToast('設定完成，' + j.name + '你好');
+      loadMe();
+    } else if (r.status === 429) {
+      pairFail('請稍後再試', '嘗試次數太多了，請過幾分鐘再點一次連結。');
+    } else {
+      pairFail('這個連結已失效', '這個連結已失效，請向管理員索取新的。');
+    }
+  } catch (e) {
+    pairFail('連不上伺服器', '請確認手機有網路，然後再點一次連結。');
+  }
+}
+
+// ---------------- Init ----------------
+renderHome();
+updateNetUI();
+loadPendingQueue();
+
+document.getElementById('wifiOnly').checked = ExpenseSync.getPolicy() === 'wifi_only';
+if (ExpenseSync.getKey()) loadMe();
+const savedUser = loadUser();
+const pairMatch = /^#pair=([A-Za-z0-9_-]{1,200})$/.exec(location.hash);
+if (pairMatch) {
+  history.replaceState(null, '', location.pathname + location.search); // 立刻清掉網址中的配對碼
+  pairWithToken(pairMatch[1]);
+} else if (!ExpenseSync.getKey()) {
+  showBind(); // 尚未綁定裝置金鑰
+} else if (savedUser && loadPins()[savedUser]) {
+  chooseIdentity(savedUser); // 此身份已自行開啟 PIN → 顯示解鎖畫面
+} else if (savedUser) {
+  finishLogin(savedUser); // PIN 為選用、預設關閉：直接進首頁
+} else {
+  loginFromServer(); // 已有金鑰但沒存姓名：姓名來自伺服器
+}
+</script>
+</body>
+</html>

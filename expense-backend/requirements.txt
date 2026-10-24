@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+PyYAML
+pyzbar
+Pillow
+qrcode[pil]
+pytest
+httpx
+playwright

@@ -1,0 +1,49 @@
+# 己方（公司）統一編號：OCR 抽取時會排除。（佔位值，請以實際統編取代）
+company:
+  tax_id: "22099131"
+# PWA 實際使用的來源（scheme://host[:port]），不可用 *。留空 = 只允許同源。
+cors_allowed_origins: []
+#  - "http://100.x.y.z:8080"
+db_path: data/expense.db
+storage_dir: data/receipts
+default_rules:
+  - {keyword: 計程車, category: 交通, confidence: 0.9}
+  - {keyword: 高鐵, category: 交通, confidence: 0.9}
+  - {keyword: 星巴克, category: 餐飲, confidence: 0.9}
+  - {keyword: 便當, category: 餐飲, confidence: 0.8}
+  - {keyword: 文具, category: 辦公用品, confidence: 0.8}
+# 裝置金鑰與限流（M1）
+auth:
+  device_key_default_days: 365   # 新裝置金鑰預設有效天數；可在建立／事後用 admin 命令調整
+  fail_limit: 10                 # 同一 IP 在視窗內驗證失敗幾次後封鎖「無效金鑰」的請求
+  fail_window_seconds: 900
+  device_rate_per_min: 60
+# 收件限制與保存（M2）
+limits:
+  daily_submit_limit: 100     # 每裝置每日（台北時間）最多幾筆
+  daily_upload_limit_mb: 200  # 每裝置每日上傳總量
+  max_file_mb: 5              # 單一檔案
+  max_request_mb: 15          # 整個請求本體
+logging:
+  access_log_dir: data/logs
+  retention_days: 90          # 存取記錄保留天數（不含請求本體與金鑰）
+retention:
+  retention_days: 1825        # 資料與圖片保存 5 年，到期由 `python -m app.maintenance purge` 刪除
+  purge_enabled: false        # 排程是否自動執行到期刪除。不可逆：請等會計確認「5 年」起算點後再改為 true
+# 自動審核規則（M3）。規則只能經由此設定檔與部署流程變更，不提供任何 API 修改。
+review:
+  rule_version: v1            # 變更任何門檻時請同步改版本號；每筆決定都會記錄版本
+  max_amount: 5000            # QR 發票單筆自動核准上限
+  max_age_days: 90            # 發票距今超過幾天改轉人工
+  monthly_cap: 30000          # 每裝置每月（台北時間）自動核准總額上限
+  no_receipt_limit: 1000      # 無單據 ≤ 此金額自動核准，超過轉人工
+  sample_percent: 10          # 自動核准案件中標記「抽查」的比例
+# 通知與維運檢查（M4）。目前通知只寫入記錄檔；Email 寄送需使用者提供寄信服務的帳號或機密後再接。
+notify:
+  recipient: "yys1114@gmail.com"
+  log_path: data/notifications.log
+  disk_alert_percent: 80
+  held_overdue_days: 7
+# 備份（M4）。本機資料夾僅供測試／暫存；正式環境請改用雲端儲存桶（加密、限權、禁止公開）。
+backup:
+  local_dir: data/backups

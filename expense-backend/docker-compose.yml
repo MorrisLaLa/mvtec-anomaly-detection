@@ -1,0 +1,83 @@
+# 本機或單台 VM：應用程式 + Caddy（自動 HTTPS）。機密與主機名稱一律由環境變數提供（.env 已被忽略）。
+#   有網域：PUBLIC_HOSTNAME=<你的主機名稱> docker compose --profile domain up -d
+#   沒網域：docker compose --profile funnel up -d  （再用 Tailscale Funnel 取得 https 網址，見 deploy/funnel/README.md）
+services:
+  app:
+    build: .
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    restart: unless-stopped
+    environment:
+      EXPENSE_DB_PATH: /data/expense.db
+      EXPENSE_STORAGE_DIR: /data/receipts
+      EXPENSE_LOG_DIR: /data/logs
+      EXPENSE_BACKUP_DIR: /data/backups
+      EXPENSE_NOTIFY_LOG: /data/notifications.log
+    volumes:
+      - expense-data:/data
+  ops:  # 排程：每日備份／檢查、每月報告、每季還原演練（到期刪除預設關閉）
+    build: .
+    command: ["python", "-m", "app.scheduler"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    restart: unless-stopped
+    environment:
+      EXPENSE_DB_PATH: /data/expense.db
+      EXPENSE_STORAGE_DIR: /data/receipts
+      EXPENSE_LOG_DIR: /data/logs
+      EXPENSE_BACKUP_DIR: /data/backups
+      EXPENSE_NOTIFY_LOG: /data/notifications.log
+      EXPENSE_SCHEDULER_STATE: /data/scheduler-state.json
+    volumes:
+      - expense-data:/data
+  litestream:  # 選用：docker compose --profile replicate up -d（需先設定 BACKUP_BUCKET 與 VM 服務帳號權限）
+    image: litestream/litestream:0.3.13
+    profiles: ["replicate"]
+    command: ["replicate", "-config", "/etc/litestream.yml"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    restart: unless-stopped
+    environment:
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-}   # 不設為必填：compose 會對未啟用 profile 的服務也做變數代換
+    volumes:
+      - expense-data:/data
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+  caddy-funnel:  # 不需要網域：docker compose --profile funnel up -d，再執行 deploy/funnel/enable.sh
+    image: caddy:2.8.4
+    profiles: ["funnel"]
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "127.0.0.1:8080:8080"   # 只開給本機的 Tailscale Funnel，不直接對外
+    volumes:
+      - ./deploy/Caddyfile.funnel:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+  caddy:  # 有網域時：docker compose --profile domain up -d
+    image: caddy:2.8.4
+    profiles: ["domain"]
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-}   # 不設為必填：compose 會對未啟用 profile 的服務也做變數代換；domain 路線請務必設定
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  expense-data:
+  caddy-data:
+  caddy-config:
