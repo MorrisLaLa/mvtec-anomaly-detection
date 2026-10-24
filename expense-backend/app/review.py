@@ -3,19 +3,46 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
+import secrets
+from pathlib import Path
 from datetime import date, datetime, timedelta
 
 from .accesslog import taipei_day
 
 
-def is_sampled(device_id: int, client_id: str, percent: int) -> bool:
-    """決定性抽樣：同一筆永遠得到同一結果，方便稽核與測試。"""
+def is_sampled(device_id: int, client_id: str, percent: int, secret: bytes = b"") -> bool:
+    """決定性抽樣（同一把秘密下同一筆結果不變）。client_id 由用戶端決定，所以必須以伺服器端秘密做 HMAC，
+    否則改過的用戶端可以挑出永不被抽查的編號（資安審查 S2）。結果在送出時就存進 expenses.sampled。"""
     if percent <= 0:
         return False
     if percent >= 100:
         return True
-    return int(hashlib.sha256(f"{device_id}:{client_id}".encode()).hexdigest()[:8], 16) % 100 < percent
+    digest = hmac.new(secret, f"{device_id}:{client_id}".encode(), hashlib.sha256).hexdigest()
+    return int(digest[:8], 16) % 100 < percent
+
+
+def load_or_create_secret(path: str) -> bytes:
+    """讀取抽樣秘密；不存在就產生（權限 0600）。放在資料庫旁、不在收據目錄，所以不會進備份；
+    遺失只會讓之後的抽樣結果改變，已存的 sampled 不受影響。"""
+    p = Path(path)
+    if not p.exists():  # 先寫暫存檔再原子地連結，兩個程序同時啟動也不會讀到寫一半的檔
+        tmp = p.with_name(f".{p.name}.{os.getpid()}.{secrets.token_hex(4)}")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(secrets.token_bytes(32))
+        try:
+            os.link(tmp, p)
+        except FileExistsError:
+            pass
+        finally:
+            tmp.unlink()
+    data = p.read_bytes()
+    if len(data) < 32:
+        raise ValueError(f"抽樣秘密檔 {p} 內容不正確")
+    return data
 
 
 def add_event(db, expense_id, event, actor, *, actor_device_id=None, from_status=None, to_status=None,
@@ -27,7 +54,7 @@ def add_event(db, expense_id, event, actor, *, actor_device_id=None, from_status
          now.strftime("%Y-%m-%dT%H:%M:%SZ")))
 
 
-def decide(db, cfg, now: datetime, device: dict, client_id: str, x: dict) -> dict:
+def decide(db, cfg, now: datetime, device: dict, client_id: str, x: dict, secret: bytes = b"") -> dict:
     """x：amount, doc_type, category, rec_source, rec_conf, invoice_no, invoice_date, expense_date,
     seller_tax_id, buyer_tax_id, amount_mismatch。回傳 {status, reasons, sampled}。"""
     today = taipei_day(now)
@@ -75,7 +102,7 @@ def decide(db, cfg, now: datetime, device: dict, client_id: str, x: dict) -> dic
         hold.append(f"本月自動核准總額將超過 NT${cfg.review_monthly_cap:,}")
     if hold:
         return {"status": "held", "reasons": hold, "sampled": False}
-    return {"status": "approved", "reasons": [], "sampled": is_sampled(device["id"], client_id, cfg.review_sample_percent)}
+    return {"status": "approved", "reasons": [], "sampled": is_sampled(device["id"], client_id, cfg.review_sample_percent, secret)}
 
 
 def reasons_json(reasons: list[str]) -> str:

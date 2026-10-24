@@ -235,7 +235,7 @@ async def submit(
         "amount": amount_val, "doc_type": doc_type, "category": cat, "rec_source": rec["source"],
         "rec_conf": rec["confidence"], "invoice_no": invoice_no, "invoice_date": invoice_date,
         "expense_date": expense_date or invoice_date, "seller_tax_id": seller_tax_id or None,
-        "buyer_tax_id": buyer_tax_id, "amount_mismatch": amount_mismatch})
+        "buyer_tax_id": buyer_tax_id, "amount_mismatch": amount_mismatch}, secret=st.sampling_secret)
     try:
         _insert_expense(db, device, payload_hash, client_id, case_no, owner_case_no, doc_type, amount_val, expense_date,
                         store, seller_tax_id, buyer_tax_id, invoice_no, invoice_date, cat, cat_src, cat_conf, rec,

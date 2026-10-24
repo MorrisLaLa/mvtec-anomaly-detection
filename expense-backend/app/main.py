@@ -12,6 +12,7 @@ from .config import Settings, load_settings
 from .limits import BodyLimitMiddleware
 from .ocr_provider import NullOCRProvider, OCRProvider
 from .routers import expenses, pair, review
+from .review import load_or_create_secret
 from .storage import LocalStorage, StorageBackend
 
 
@@ -40,6 +41,7 @@ def create_app(
     app.state.ocr = ocr or NullOCRProvider()
     app.state.storage = storage or LocalStorage(settings.storage_dir)
     app.state.db_factory = lambda: database.connect(settings.db_path)
+    app.state.sampling_secret = load_or_create_secret(str(Path(settings.db_path).parent / "sampling.key"))
     app.state.access_log = AccessLog(settings.access_log_dir, settings.access_log_retention_days)
     app.include_router(expenses.router, prefix="/api/v1")
     app.include_router(pair.router, prefix="/api/v1")
