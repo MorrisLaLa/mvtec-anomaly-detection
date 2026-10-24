@@ -1266,16 +1266,26 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
         'seller_tax_id', 'buyer_tax_id', 'invoice_no', 'invoice_date', 'category', 'category_source', 'recognition_source',
         'recognition_confidence', 'needs_review', 'review_status', 'reviewed_by', 'reviewed_at', 'review_reasons',
         'review_comment', 'sampled', 'created_day'];
+      const head = ['編號', '申報識別碼', '案號', '業主案號', '單據類型', '申報人', '金額', '支出日期', '店家', '賣方統編',
+        '買方統編', '發票號碼', '發票日期', '用途', '用途來源', '辨識方式', '辨識信心', '需人工審核', '審核狀態',
+        '審核者', '審核時間', '審核理由', '審核意見', '抽查', '申報日期'];
+      const VALS = { review_status: { approved: '已核准', held: '待審核', rejected: '已退回' } };
+      const val = (c, v) => {
+        if (c === 'needs_review' || c === 'sampled') return v ? '是' : '否';
+        if (c === 'reviewed_by' && typeof v === 'string' && v.startsWith('auto:')) return '自動（' + v.slice(5) + '）';
+        if (c === 'review_reasons') return (v || []).join('；');
+        return (VALS[c] || {})[v] ?? v;
+      };
       const f = query.get('from') || '', t = query.get('to') || '';
       const cell = (v) => {
         if (v === undefined || v === null) return '';
-        let s = Array.isArray(v) ? JSON.stringify(v) : typeof v === 'boolean' ? String(Number(v)) : String(v);
+        let s = String(v);
         if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
         return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
       const rows = state.items.filter((x) => (!f || x.created_day >= f) && (!t || x.created_day <= t))
-        .map((x) => cols.map((c) => cell(c === 'needs_review' ? x.review_status === 'held' : x[c])).join(','));
-      return new Response([cols.join(','), ...rows].join('\r\n') + '\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8' } });
+        .map((x) => cols.map((c) => cell(val(c, c === 'needs_review' ? x.review_status === 'held' : x[c]))).join(','));
+      return new Response([head.join(','), ...rows].join('\r\n') + '\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8' } });
     }
     if (path === '/review/items') {
       const st = query.get('status') || 'held', sp = query.get('sampled');

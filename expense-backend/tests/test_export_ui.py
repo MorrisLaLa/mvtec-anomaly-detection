@@ -36,8 +36,8 @@ def test_export_defaults_to_this_month_and_opens_in_excel(server, page):
     assert name.endswith(".csv") and today.isoformat() in name
     assert data.startswith(b"\xef\xbb\xbf")  # BOM：Excel 才會用 UTF-8 開，中文不亂碼
     rows = list(csv.DictReader(io.StringIO(data.decode("utf-8-sig"))))
-    assert {r["client_id"] for r in rows} == {"E1", "E2"}
-    assert {r["store"] for r in rows} == {"'=HYPERLINK(1)", "五金行"}  # 公式防護仍在
+    assert {r["申報識別碼"] for r in rows} == {"E1", "E2"}
+    assert {r["店家"] for r in rows} == {"'=HYPERLINK(1)", "五金行"}  # 公式防護仍在
 
 
 def test_export_respects_date_range(server, page):

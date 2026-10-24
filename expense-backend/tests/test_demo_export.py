@@ -13,7 +13,9 @@ def test_demo_reviewer_exports_csv(page):
     data = open(d.value.path(), "rb").read()
     assert data.startswith(b"\xef\xbb\xbf")
     text = data.decode("utf-8-sig")
-    assert text.splitlines()[0].startswith("id,client_id,case_no")
+    from tests.test_export_chinese import EXPECTED
+    assert text.splitlines()[0].split(",") == EXPECTED  # 與正式版相同的中文欄名
+    assert "待審核" in text and "已核准" in text
     assert "現場零星採買" in text and "阿明小吃部" in text
     assert page.errors == []
 
@@ -30,7 +32,7 @@ def test_demo_uses_artifact_downloads_when_available(page):
     page.wait_for_function("window.__saved !== null", timeout=10000)
     saved = page.evaluate("window.__saved")
     assert saved["filename"].endswith(".csv") and saved["bom"] == 0xEF
-    assert "client_id" in saved["text"]
+    assert "申報識別碼" in saved["text"]
     page.wait_for_selector("#toast >> text=已匯出")
 
 

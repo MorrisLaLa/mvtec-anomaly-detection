@@ -271,10 +271,10 @@ def test_export_whitelist_filters_audit_and_formula_guard(env):
     r = c.get("/api/v1/export", headers=H(keys["乙"]))
     rows = list(csv.DictReader(io.StringIO(r.text)))
     assert len(rows) == 2 and not any(k.endswith("_path") for k in rows[0]) and "payload_hash" not in rows[0]
-    assert {"client_id", "employee", "amount", "review_status"} <= set(rows[0])
-    assert next(x for x in rows if x["client_id"] == "X1")["store"].startswith("'=")
+    assert {"申報識別碼", "申報人", "金額", "審核狀態"} <= set(rows[0])  # 中文欄名（使用者 2026-10-24 決定）
+    assert next(x for x in rows if x["申報識別碼"] == "X1")["店家"].startswith("'=")
     only = list(csv.DictReader(io.StringIO(c.get("/api/v1/export?status=held&case_no=UY2301", headers=H(keys["乙"])).text)))
-    assert [x["client_id"] for x in only] == ["X2"]
+    assert [x["申報識別碼"] for x in only] == ["X2"]
     assert c.get("/api/v1/export", headers=H(keys["甲"])).status_code == 403
     logs = "".join(p.read_text(encoding="utf-8") for p in Path(s.access_log_dir).glob("*.log"))
     assert '"event": "export"' in logs

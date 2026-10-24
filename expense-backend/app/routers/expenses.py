@@ -329,6 +329,29 @@ EXPORT_COLUMNS = ["id", "client_id", "case_no", "owner_case_no", "doc_type", "em
                   "seller_tax_id", "buyer_tax_id", "invoice_no", "invoice_date", "category", "category_source",
                   "recognition_source", "recognition_confidence", "needs_review", "review_status", "reviewed_by",
                   "reviewed_at", "review_reasons", "review_comment", "sampled", "created_day"]
+# 給會計用 Excel 開的中文欄名與代碼對照（使用者 2026-10-24 決定）；篩選參數與資料庫內容仍是英文代碼
+EXPORT_HEADERS = {
+    "id": "編號", "client_id": "申報識別碼", "case_no": "案號", "owner_case_no": "業主案號", "doc_type": "單據類型",
+    "employee": "申報人", "amount": "金額", "expense_date": "支出日期", "store": "店家", "seller_tax_id": "賣方統編",
+    "buyer_tax_id": "買方統編", "invoice_no": "發票號碼", "invoice_date": "發票日期", "category": "用途",
+    "category_source": "用途來源", "recognition_source": "辨識方式", "recognition_confidence": "辨識信心",
+    "needs_review": "需人工審核", "review_status": "審核狀態", "reviewed_by": "審核者", "reviewed_at": "審核時間",
+    "review_reasons": "審核理由", "review_comment": "審核意見", "sampled": "抽查", "created_day": "申報日期"}
+_EXPORT_VALUES = {
+    "review_status": {"approved": "已核准", "held": "待審核", "rejected": "已退回"},
+    "category_source": {"user": "使用者填寫", "vendor": "廠商預設", "rule": "自動規則"},
+    "recognition_source": {"qr": "電子發票 QR", "ocr": "文字辨識", "manual": "手動輸入", "none": "無"},
+    "recognition_confidence": {"high": "高", "low": "低"},
+    "needs_review": {0: "否", 1: "是"}, "sampled": {0: "否", 1: "是"},
+}
+
+
+def _export_value(col, v):
+    if col == "reviewed_by" and isinstance(v, str) and v.startswith("auto:"):
+        return f"自動（{v[5:]}）"
+    if col == "review_reasons":
+        return "；".join(json.loads(v or "[]"))
+    return _EXPORT_VALUES.get(col, {}).get(v, v)
 
 
 @router.get("/export")
@@ -347,9 +370,10 @@ def export(request: Request, status: str = "", from_: str = Query("", alias="fro
     rows = db.execute(sql, args).fetchall()
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(EXPORT_COLUMNS)
+    w.writerow([EXPORT_HEADERS[c] for c in EXPORT_COLUMNS])
     for r in rows:
-        w.writerow([("'" + v if isinstance(v, str) and v and v[0] in "=+-@\t\r" else v) for v in tuple(r)])
+        vals = [_export_value(c, v) for c, v in zip(EXPORT_COLUMNS, tuple(r))]
+        w.writerow([("'" + v if isinstance(v, str) and v and v[0] in "=+-@\t\r" else v) for v in vals])
     st = request.app.state
     st.access_log.event("export", st.clock(), device_id=device["id"], rows=len(rows), filters=bool(where))
     return Response(buf.getvalue(), media_type="text/csv; charset=utf-8")

@@ -131,7 +131,7 @@ def test_csv_formula_injection_all_vectors_and_no_corruption_of_empty_cells(clie
                                                 "category": "餐飲"})
         assert r.status_code == 200, r.text
     rows = list(csv.DictReader(io.StringIO(client.get("/api/v1/export", headers=auth(keys["reviewer"])).text)))
-    stores = {r["client_id"]: r["store"] for r in rows}
+    stores = {r["申報識別碼"]: r["店家"] for r in rows}  # 中文欄名（使用者 2026-10-24 決定）
     for i in range(4):
         assert stores[f"CSV{i}"][0] == "'", stores[f"CSV{i}"]
     assert stores["CSV4"] == "", repr(stores["CSV4"])
