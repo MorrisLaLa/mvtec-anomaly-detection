@@ -868,6 +868,10 @@
     <div class="onboard">
       <label class="wifi-row"><input type="checkbox" id="pinEnabled" onchange="onPinToggle()"> 開啟 PIN（選用：每次開啟要輸入 4 位數）</label>
       <div class="onboard-sub">PIN 只是這支手機本機的解鎖，不是必要的。手機遺失請通知管理員撤銷。</div>
+      <div id="adminTools" style="display:none; margin-top:18px;">
+        <button class="btn btn-secondary" id="unblockBtn" onclick="unblockLogins()">解除登入封鎖</button>
+        <div class="onboard-sub">有人打錯太多次時，其他人可能暫時無法綁定新手機；按這裡立即解除（只有管理員看得到）。</div>
+      </div>
     </div>
   </div>
 
@@ -1211,7 +1215,16 @@ let pinContext = 'unlock';  // 'unlock'（開啟 App 時）| 'settings'（從設
 
 function openSettings() {
   document.getElementById('pinEnabled').checked = !!(currentUser && loadPins()[currentUser]);
+  document.getElementById('adminTools').style.display = myRole === 'admin' ? 'block' : 'none';  // 只是隱藏；伺服器端另有角色檢查
   showScreen('screen-settings');
+}
+async function unblockLogins() {
+  try {
+    const r = await api('/api/v1/admin/unblock', { method: 'POST' });
+    if (!r.ok) { showToast(r.status === 403 ? '只有管理員可以解除' : '解除失敗，請稍後再試'); return; }
+    const n = (await r.json()).cleared;
+    showToast(n ? `已解除封鎖（${n} 個來源）` : '已解除（目前沒有被封鎖的來源）');
+  } catch (e) { showToast('連不上伺服器'); }
 }
 function onPinToggle() {
   const box = document.getElementById('pinEnabled');

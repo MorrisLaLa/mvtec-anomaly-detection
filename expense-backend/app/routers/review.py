@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from .. import review as engine
-from ..auth import any_device, reviewer_only
+from ..auth import any_device, require_role, reviewer_only
 from .expenses import get_db
 
 router = APIRouter()
@@ -97,3 +97,17 @@ def get_file(kind: str, request: Request, expense_id: int = ExpenseId, device=re
         raise HTTPException(404, "not found")
     media = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp"}.get(p.suffix, "application/octet-stream")
     return FileResponse(p, media_type=media, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/admin/unblock")
+def unblock(request: Request, device=require_role("admin")):
+    """M1 修訂 6：管理員在手機上解除登入／配對的 IP 封鎖（Funnel 後可能所有人共用同一來源）。
+    清除全部失敗計數；回傳被解除的來源數。有效金鑰本來就不受封鎖影響，所以管理員自己一定呼叫得到。"""
+    st = request.app.state
+    cfg, now = st.settings, st.clock()
+    fails = st.fail_window
+    ts = now.timestamp()
+    cleared = sum(1 for ip in list(fails.events) if fails.count(ip, ts, cfg.auth_fail_window_s) >= cfg.auth_fail_limit)
+    fails.events.clear()
+    st.access_log.event("unblock", now, device_id=device["id"], cleared=cleared)
+    return {"ok": True, "cleared": cleared}

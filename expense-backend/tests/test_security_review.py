@@ -45,6 +45,7 @@ def test_every_registered_route_rejects_anonymous(client):
     assert len(routes) >= 10
     assert (ROOT / "app/main.py").read_text(encoding="utf-8").count("include_router(") == 3  # 新增 router 時請更新 _api_routes
     for method, path in routes:
+        client.app.state.fail_window.events.clear()  # 路由超過 10 條時，IP 封鎖會讓後面的回 429，遮蔽要驗的 401
         r = client.request(method, path, headers=ANON)
         assert r.status_code == 401, (method, path, r.status_code)
 
