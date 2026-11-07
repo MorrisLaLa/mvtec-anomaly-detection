@@ -30,6 +30,8 @@
 | D2 | 中 | 來源 IP 的信任設定：`Dockerfile` 的 uvicorn 用 `--forwarded-allow-ips "*"`。目前 app 的 8000 埠沒有對外開放，所以只有 Caddy 連得到；若哪天直接開放，`X-Forwarded-For` 可以被偽造，用來繞過 IP 封鎖。**走 Funnel 時**，Caddy 看到的來源可能全是本機 → 所有人共用同一個 IP 計數：任何人打錯 10 次，**所有人**在 15 分鐘內都無法配對（阻斷服務），封鎖也失去意義。 | 把 `--forwarded-allow-ips` 限縮成 Caddy 容器；實機確認 Funnel 會送哪些標頭後，再在 `Caddyfile.funnel` 設定 `trusted_proxies`。這一項與規格 M4 修訂 4 的「上線前必驗」相同。 |
 | D3 | 中 | CSP 允許 `script-src 'unsafe-inline'`。目前前台所有使用者資料都有經過 `escapeHtml`（含主管審核畫面，已用測試確認），但只要日後出現任何一個注入點，CSP 就擋不住。 | 視窗 9：把內嵌腳本移到外部檔案（或改用 nonce／hash），再拿掉 `'unsafe-inline'`；`onclick="…'${clientId}'…"` 這類寫法一併改成 `addEventListener`。 |
 
+> **D3 已修（台北 2026-11-07，視窗 9）：** 前台腳本移到 `frontend/app.js`，60 個行內事件改為 `data-click`／`data-change`／`data-input` 由統一分派處理；兩份 Caddyfile 的 CSP 改為 `script-src 'self'`（樣式仍允許 `'unsafe-inline'`，風險較低）。測試 `tests/test_csp_strict.py` 在嚴格 CSP 下跑現場、審核、管理主要流程，確認沒有任何被擋的腳本。未在真實 Caddy 上驗證回應標頭。
+
 ## 三、本視窗已修（先寫測試確認紅 → 修 → 綠）
 
 | # | 嚴重度 | 發現 | 修正 |

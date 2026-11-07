@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 src = (ROOT / "frontend" / "expense-demo.html").read_text(encoding="utf-8")
 sync = (ROOT / "frontend" / "sync.js").read_text(encoding="utf-8")
+app_js = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
 mock = (ROOT / "scripts" / "demo_mock.js").read_text(encoding="utf-8")
 
 # 1) 取出 <style>、<body> 內容；丟掉 doctype／html／head／body 標籤與 PWA 用的 meta／manifest（發布時會自動包骨架）
@@ -49,6 +50,7 @@ document.querySelectorAll('[data-srv]').forEach(function (b) { b.onclick = funct
 body = body.replace('<div class="pin-error" id="bindError"', '<div class="onboard-sub" style="margin:8px 0 0;">示範金鑰：<span class="mono">ek_demo_submitter</span>（申報人）、<span class="mono">ek_demo_reviewer</span>（審核人員）、<span class="mono">ek_demo_admin</span>（管理員）。上方示範列有「填入金鑰」按鈕。</div>\n      <div class="pin-error" id="bindError"', 1)
 # 6) 內嵌 sync.js 與模擬伺服器（模擬伺服器必須先於 sync.js）
 body = body.replace('<script src="sync.js"></script>', "<script>\n" + mock + "\n</script>\n<script>\n" + sync + "\n</script>", 1)
+body = body.replace('<script src="app.js"></script>', "<script>\n" + app_js + "\n</script>", 1)  # 示範版是單一檔案
 
 # 7) 示範版專用：正式版的「拍照／相簿」會開啟真的選檔；示範版（沒有真的相機與後端辨識）改用模擬的單據
 demo_capture = """

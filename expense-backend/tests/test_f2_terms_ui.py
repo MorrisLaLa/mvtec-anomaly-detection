@@ -65,6 +65,6 @@ def test_confirm_screen_and_case_sheet_wording(server, page):
 
 def test_toast_wording(server, page):
     login(page, server)
-    src = page.content()
+    src = page.content() + page.evaluate("fetch('app.js').then(r => r.text())")  # 腳本已移到 app.js（D3）
     assert not re.search(r"showToast\([^)]*已退回：", src)   # 頁面原始碼中的提示文字也用新說法
     assert "待主管審核" not in src

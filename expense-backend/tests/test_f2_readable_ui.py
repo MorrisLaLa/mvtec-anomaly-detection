@@ -12,7 +12,7 @@ MEASURE = """() => {
     for (let e = el; e; e = e.parentElement) if (getComputedStyle(e).display === 'none') return false;
     return true; };
   const name = el => el.id ? '#' + el.id : '.' + String(el.className || el.tagName).trim().split(/\\s+/).join('.');
-  document.querySelectorAll('button, input:not([type=hidden]):not([type=file]):not([type=checkbox]), select, textarea, [onclick], .chip, a').forEach(el => {
+  document.querySelectorAll('button, input:not([type=hidden]):not([type=file]):not([type=checkbox]), select, textarea, [onclick], [data-click], .chip, a').forEach(el => {
     if (!vis(el) || el.disabled) return;
     const h = el.getBoundingClientRect().height;
     if (h < 43.5) small.push(name(el) + ' 高 ' + Math.round(h));
@@ -60,7 +60,7 @@ def test_result_card_is_readable(server, page):
 
 
 def test_production_page_has_no_demo_content(server, page):
-    src = (FRONTEND / "expense-demo.html").read_text(encoding="utf-8")
+    src = (FRONTEND / "expense-demo.html").read_text(encoding="utf-8") + (FRONTEND / "app.js").read_text(encoding="utf-8")  # 腳本已移到 app.js（D3）
     for marker in ("demo-bar", "示範版", "__demoSim", "__demoReset", "ek_demo_", "data-srv"):
         assert marker not in src, marker
     login(page, server)

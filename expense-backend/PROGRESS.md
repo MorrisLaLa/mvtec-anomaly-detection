@@ -577,3 +577,13 @@
 - 修了我自己的測試（實作前）：拿掉一行會真的連到外部郵件伺服器的斷言（測試不應連外）。
 - 突變驗證：不加密、記錄洩漏密碼、標頭可注入、寄信失敗會中斷，四項都有測試變紅。
 - 限制：只用模擬的 SMTP 伺服器測過，本環境連不到 Gmail，**沒有真的寄出過**；要等使用者在 Windows 部署時用 `python -m app.notify test` 確認。
+
+---
+# 視窗 9 單元 1：拿掉 CSP 的 script-src 'unsafe-inline'（資安審查 D3）（台北 2026-11-07，今天不限時）
+- 測試：新增 `tests/test_csp_strict.py` 5 個（靜態檢查＋在嚴格 CSP 下跑主要流程），先確認紅再實作；**完整全套 505／505 通過**（之後補的第 5 個測試只單獨跑過該檔，5 個全過）。
+- 做了什麼：內嵌腳本移到 `frontend/app.js`；行內事件改為 `data-click` 等，由統一分派處理（`data-args` JSON、`data-pass` 附加事件或元素）；首頁每筆申報的「看簽收單」改成忽略來自按鈕的點擊（統一分派後 stopPropagation 來不及擋住外層）；兩份 Caddyfile 的 CSP 改為 `script-src 'self'`；示範版打包時一併內嵌 app.js。
+- 修了既有測試以免變成「找不到也通過」（加嚴）：`test_f2_readable_ui.py` 的正式版檢查加讀 app.js、可點元素選擇器加 `[data-click]`；`test_f2_terms_ui.py` 的舊用語檢查加讀 app.js。
+- 修了我自己的新測試：嚴格 CSP 下 Playwright 的 `wait_for_function`（字串）會被當成 eval 擋下，改用 `wait_for_selector`。
+- 突變驗證：Funnel 版放回 unsafe-inline、動態 HTML 放回行內事件、分派不帶參數，三項都有測試變紅；「按鈕點擊連帶開簽收單」第一輪沒被抓到，補了測試才變紅。
+- 中途工作程序重啟過一次，檔案完整保留，已確認突變後檔案都已還原。
+- 限制：樣式仍允許 'unsafe-inline'；未在真實 Caddy 上驗證回應標頭；未在真實手機上測試。
