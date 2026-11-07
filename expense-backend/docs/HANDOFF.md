@@ -1,3 +1,5 @@
+> **⚠ 已搬家（台北 2026-11-07）：支出系統已移到獨立 repo `MorrisLaLa/expense-system`（`main` 分支）。本分支不再更新，請改用新 repo 的 `docs/HANDOFF.md`。**
+
 # 新工作階段交接提示詞
 
 使用方式：在 Claude Code 新開工作階段，**選取 repo `MorrisLaLa/mvtec-anomaly-detection` 與分支 `claude/expense-reporting-system-a4vamf`**（沒選 repo 就沒有推送權限），把下面「提示詞」整段貼進去。
