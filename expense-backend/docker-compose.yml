@@ -34,6 +34,9 @@ services:
       EXPENSE_BACKUP_DIR: /data/backups
       EXPENSE_NOTIFY_LOG: /data/notifications.log
       EXPENSE_SCHEDULER_STATE: /data/scheduler-state.json
+      # Email 警報（使用者 2026-11-07）：只給 ops；值來自主機的 .env，不寫在這裡。未設定則只寫記錄檔
+      EXPENSE_SMTP_USER: ${EXPENSE_SMTP_USER:-}
+      EXPENSE_SMTP_PASSWORD: ${EXPENSE_SMTP_PASSWORD:-}
     volumes:
       - expense-data:/data
   litestream:  # 選用：docker compose --profile replicate up -d（需先設定 BACKUP_BUCKET 與 VM 服務帳號權限）

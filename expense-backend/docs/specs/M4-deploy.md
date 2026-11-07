@@ -101,3 +101,9 @@
 - **不建議萬用 DNS（sslip.io）**：搜尋結果顯示共用網域會撞 Let's Encrypt 的憑證簽發上限，已有人因此失敗。
 - 實作：`deploy/Caddyfile.funnel`（本機 8080 HTTP、`auto_https off`，安全標頭與 15MB 上限與有網域版一致，測試比對）；compose 以 profile 區分入口：`funnel`（`caddy-funnel`，只綁 127.0.0.1:8080）、`domain`（原 `caddy`）；`deploy/funnel/enable.sh`（`--dry-run`）與 README。**入口代理改由 `.env` 的 `COMPOSE_PROFILES` 決定**，沒設定就只有 app／ops 啟動、外面連不進來。
 - ⚠ 上線前必驗：經 Funnel→Caddy 後應用程式看到的來源 IP 是否為真實手機 IP（影響 M1 失敗封鎖；若是代理 IP，所有人共用同一個失敗計數）。
+
+## 修訂 5：Email 警報（使用者決定，台北 2026-11-07）
+- 寄信方式：SMTP STARTTLS（預設 `smtp.gmail.com:587`），使用專用 Gmail 帳號＋應用程式密碼。帳密只從環境變數 `EXPENSE_SMTP_USER`／`EXPENSE_SMTP_PASSWORD`（主機 `.env`）讀取，只傳給 `ops` 服務，不寫入設定檔或記錄；可用 `EXPENSE_SMTP_HOST`／`EXPENSE_SMTP_PORT` 改用其他服務。
+- 行為：每則通知先寫記錄檔再寄信；寄信失敗寫一筆 `email_failed`（錯誤類型與簡訊息，密碼遮蔽），不中斷工作；收件人為 `notify.recipient`。
+- 測試信：`docker compose exec ops python -m app.notify test`。
+- 驗收：`tests/test_notify_email.py`（模擬的 SMTP 伺服器；未對真實 Gmail 驗證）。

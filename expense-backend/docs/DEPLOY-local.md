@@ -1,6 +1,6 @@
 # 部署手冊：在自己的 Windows 或 Mac 上執行
 
-使用者決定（台北 2026-10-24）：主機用自己的電腦。本手冊寫給使用者照著做。
+使用者決定（台北 2026-10-24）：主機用自己的電腦；**2026-11-07 決定伺服器放在 Windows**（Mac 只用來操作）。本手冊寫給使用者照著做。
 **誠實說明：這份手冊的步驟都還沒有在真實的 Windows 或 Mac 上實際跑過**，第一次部署時請和 Claude 一起逐步確認，有錯就回報修正。
 
 ---
@@ -62,7 +62,27 @@
 COMPOSE_PROFILES=funnel
 ```
 
-`.env` 已被 git 排除，不會被上傳。日後寄信用的應用程式密碼也會放在這裡（**不要**放進其他檔案）。
+`.env` 已被 git 排除，不會被上傳。寄信用的應用程式密碼也放在這裡（**不要**放進其他檔案、不要貼到對話或訊息裡），見第 4-1 步。
+
+### 4-1. Email 警報（使用者 2026-11-07 決定用 Email）
+
+1. 另外申請一個**專門給系統寄信**的 Gmail 帳號（例如 `xxx-system@gmail.com`）。
+2. 用那個帳號登入 Google 帳戶 → 安全性 → 開啟「兩步驟驗證」。
+3. 同一頁找「應用程式密碼」，產生一組（16 個英文字母）。
+4. 在 `.env` 加上兩行（換成你的帳號與那組密碼）：
+
+```
+EXPENSE_SMTP_USER=xxx-system@gmail.com
+EXPENSE_SMTP_PASSWORD=那組十六個字母
+```
+
+警報會寄到 `config/settings.yaml` 的 `notify.recipient`（目前是 yys1114@gmail.com）。啟動後寄一封測試信確認：
+
+```
+docker compose exec ops python -m app.notify test
+```
+
+看到「已寄出測試信」並收到信就完成。失敗時原因會寫在通知記錄檔，不會包含密碼。密碼外洩或不用時，到 Google 帳戶刪除那組應用程式密碼即可，不影響其他東西。
 
 ---
 
@@ -121,7 +141,7 @@ docker compose exec app python -m app.admin create-device --name 你的名字 --
 
 **需要你注意**
 - **備份目前存在同一台電腦上**。電腦壞掉或遺失，備份會一起不見。建議每月把 Docker 資料（或備份資料夾）複製到外接硬碟或雲端硬碟；要自動化異地備份，需另外決定存放位置。
-- **通知目前只寫進記錄檔**，不會寄 Email。設定寄信服務後才會收到警報。
+- **Email 警報**：完成第 4-1 步後，備份失敗、還原演練失敗、磁碟快滿、申報放太久沒人審、每月報告都會寄信；沒設定時只寫進記錄檔。
 - 作業系統更新：Windows Update、macOS 自動更新保持開啟。更新重開機後，Docker Desktop 會自動啟動，服務也會自動重啟（compose 設定為 `restart: unless-stopped`）。
 - 程式更新：在 `expense-backend` 資料夾執行 `docker compose up -d --build`。
 - 回到舊版：`deploy/rollback.sh <版本>`（Mac 可直接執行；Windows 需在 WSL 中執行，或改用手動步驟：`git checkout <版本>` 後 `docker compose up -d --build`）。
@@ -139,4 +159,4 @@ docker compose exec app python -m app.admin create-device --name 你的名字 --
 ## 尚未驗證／待辦（誠實說明）
 - 所有步驟未在真實 Windows／Mac 上執行過；Docker 映像版本標籤未核對。
 - Windows 上 `deploy/*.sh` 腳本需要 WSL 或 Git Bash。
-- 異地備份、Email 通知尚未設定。
+- 異地備份尚未設定；Email 寄送只用模擬的郵件伺服器測過，沒有真的寄到 Gmail（本環境連不到）。

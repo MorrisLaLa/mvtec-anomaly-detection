@@ -569,3 +569,11 @@
 - 依使用者決定改了既有測試：`test_m2.py::test_retention_purge_deletes_rows_and_files_after_5_years` 的刪除時間點從「T0+1825 天」改成新規則的 2032-06-30／07-01，其餘斷言不變。
 - 突變驗證：少算決算那一年、改回用申報日、到期當天就刪，三項都有測試變紅。
 - **到期刪除仍保持關閉**（`purge_enabled: false`）：開啟會不可逆地刪除資料，需要使用者另外同意。「次年 06-30」是我採用的保守預設（決算法定期限我沒有查證），請會計確認實際的決算完成日。
+
+---
+# Email 警報（台北 2026-11-07，使用者決定用 Email；今天不限時）
+- 測試：新增 `tests/test_notify_email.py` 8 個，先確認紅（7 個失敗）再實作；**完整全套 501／501 通過**。
+- 做了什麼：`EmailNotifier`（SMTP STARTTLS，預設 smtp.gmail.com:587；每則通知先寫記錄檔再寄；失敗寫 `email_failed`、遮蔽密碼、不中斷工作；主旨去除換行防標頭注入）；`make_notifier` 在設定了 `EXPENSE_SMTP_USER`／`EXPENSE_SMTP_PASSWORD` 時改寄 Email；`python -m app.notify test` 寄測試信；compose 只把寄信帳密傳給 `ops`。部署手冊加上 4-1 步（專用 Gmail＋應用程式密碼），M4 規格加修訂 5。
+- 修了我自己的測試（實作前）：拿掉一行會真的連到外部郵件伺服器的斷言（測試不應連外）。
+- 突變驗證：不加密、記錄洩漏密碼、標頭可注入、寄信失敗會中斷，四項都有測試變紅。
+- 限制：只用模擬的 SMTP 伺服器測過，本環境連不到 Gmail，**沒有真的寄出過**；要等使用者在 Windows 部署時用 `python -m app.notify test` 確認。
