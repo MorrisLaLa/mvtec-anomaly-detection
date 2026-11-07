@@ -87,7 +87,15 @@ async function loginFromServer(skipPin) {
       if (r.status === 200) name = (await r.json()).name || name;
     } catch (e) { /* 離線：沿用已存的姓名 */ }
   }
-  if (!skipPin && loadPins()[name]) chooseIdentity(name); else finishLogin(name);
+  if (!skipPin && loadPins()[name]) { chooseIdentity(name); return; }
+  // 回應較慢時使用者可能已經點進別的畫面：只記下姓名，不把人拉回首頁
+  const away = ['screen-review', 'screen-processing', 'screen-result', 'screen-reviewq', 'screen-settings']
+    .some(s => document.getElementById(s).style.display !== 'none');
+  if (away) {
+    currentUser = name;
+    saveUser(name);
+    document.getElementById('brandUserLabel').textContent = '一六國際 · ' + name;
+  } else finishLogin(name);
 }
 
 // ---------------- PIN flow ----------------

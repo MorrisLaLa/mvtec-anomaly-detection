@@ -587,3 +587,11 @@
 - 突變驗證：Funnel 版放回 unsafe-inline、動態 HTML 放回行內事件、分派不帶參數，三項都有測試變紅；「按鈕點擊連帶開簽收單」第一輪沒被抓到，補了測試才變紅。
 - 中途工作程序重啟過一次，檔案完整保留，已確認突變後檔案都已還原。
 - 限制：樣式仍允許 'unsafe-inline'；未在真實 Caddy 上驗證回應標頭；未在真實手機上測試。
+
+---
+# CI `test` 偶發失敗的原因與修正（台北 2026-11-07）
+- 現象：CI 上 `test_same_invoice_twice_is_rejected_as_duplicate_with_reason`、`test_online_submit_reaches_db_with_project_case_and_clears_queue` 偶發逾時（點不到「更多選項」，30 秒）；本機連跑多次都過。已在 `9782da3`、`21c4b09` 兩次出現。
+- 原因（以失敗測試重現）：已有金鑰但沒存姓名時，啟動會呼叫 `loginFromServer()` 向 `/me` 要姓名；回應慢（CI、或手機網路差）時，使用者已點進確認畫面，回應回來後 `finishLogin` 呼叫 `goHome()`，把人拉回首頁。這是前台的真實缺陷，不只是測試問題。
+- 修正：`frontend/app.js` 的 `loginFromServer`：回應回來時若使用者已在別的畫面，只記下姓名，不切畫面。新增 `tests/test_login_race.py`（攔住 `/me` 到使用者進了確認畫面才放行），先確認紅再修。
+- 驗證：完整全套 507／507 通過；重新打包 `frontend/demo.html`。
+- 限制：我是依「原因推測＋能重現的測試」判斷這就是 CI 失敗的原因，尚未在 CI 上看到修正後的結果；若仍在同一步失敗，表示還有別的原因。示範版 Artifact 未重新發布。
