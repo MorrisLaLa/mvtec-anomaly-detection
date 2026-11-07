@@ -25,7 +25,9 @@ class Settings:
     max_request_bytes: int = 15 * 1024 * 1024
     access_log_dir: str = "data/logs"
     access_log_retention_days: int = 90
-    retention_days: int = 1825
+    retention_days: int = 1825  # 已不用於到期刪除（改為 retention_years＋決算期限，使用者 2026-11-07）
+    retention_years: int = 5
+    retention_closing_deadline: str = "06-30"  # 年度決算最晚完成日（次年 月-日）
     review_rule_version: str = "v1"
     review_max_amount: int = 5000
     review_max_age_days: int = 90
@@ -63,6 +65,8 @@ def load_settings() -> Settings:
         access_log_dir=os.environ.get("EXPENSE_LOG_DIR", (raw.get("logging") or {}).get("access_log_dir", "data/logs")),
         access_log_retention_days=int((raw.get("logging") or {}).get("retention_days", 90)),
         retention_days=int((raw.get("retention") or {}).get("retention_days", 1825)),
+        retention_years=int((raw.get("retention") or {}).get("retention_years", 5)),
+        retention_closing_deadline=str((raw.get("retention") or {}).get("closing_deadline", "06-30")),
         review_rule_version=str((raw.get("review") or {}).get("rule_version", "v1")),
         review_max_amount=int((raw.get("review") or {}).get("max_amount", 5000)),
         review_max_age_days=int((raw.get("review") or {}).get("max_age_days", 90)),

@@ -265,8 +265,9 @@ def test_retention_purge_deletes_rows_and_files_after_5_years(tmp_path):
         assert post(c, keys["submitter"], {"client_id": "NEW"}, receipt=png()).status_code == 200
         before = files_on_disk(s.storage_dir)
         assert len(before) == 3
-        assert maintenance.purge_expired(app, now=T0 + timedelta(days=1824))["deleted"] == 0
-        res = maintenance.purge_expired(app, now=T0 + timedelta(days=1826))
+        # 使用者 2026-11-07：年度決算（次年 06-30）後保存 5 年 → 2026 年的申報保存到 2032-06-30
+        assert maintenance.purge_expired(app, now=datetime(2032, 6, 30, 4, 0, tzinfo=timezone.utc))["deleted"] == 0
+        res = maintenance.purge_expired(app, now=datetime(2032, 7, 1, 4, 0, tzinfo=timezone.utc))
         assert res["deleted"] == 1
         assert [r[0] for r in conn.execute("SELECT client_id FROM expenses")] == ["NEW"]
         assert len(files_on_disk(s.storage_dir)) == 1

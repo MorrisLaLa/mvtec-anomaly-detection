@@ -28,7 +28,8 @@ logging:
   access_log_dir: data/logs
   retention_days: 90          # 存取記錄保留天數（不含請求本體與金鑰）
 retention:
-  retention_days: 1825        # 資料與圖片保存 5 年，到期由 `python -m app.maintenance purge` 刪除
+  retention_years: 5          # 會計確認（2026-11-07）：年度決算完成後保存 5 年
+  closing_deadline: "06-30"   # 決算最晚完成日（支出年度的次年 月-日）；保存到其後滿 5 年才刪除
   purge_enabled: false        # 排程是否自動執行到期刪除。不可逆：請等會計確認「5 年」起算點後再改為 true
 # 自動審核規則（M3）。規則只能經由此設定檔與部署流程變更，不提供任何 API 修改。
 review:
