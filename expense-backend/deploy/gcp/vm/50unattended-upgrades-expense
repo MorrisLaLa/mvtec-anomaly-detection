@@ -1,0 +1,10 @@
+// 自動安裝安全性更新，必要時於維護時間窗重開機。
+// 重開時間是 UTC：18:30 = 台北 02:30，早於 03:10 的每日備份，且不在上班時間。
+Unattended-Upgrade::Allowed-Origins {
+        "${distro_id}:${distro_codename}-security";
+        "${distro_id}ESMApps:${distro_codename}-apps-security";
+        "${distro_id}ESM:${distro_codename}-infra-security";
+};
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "18:30";

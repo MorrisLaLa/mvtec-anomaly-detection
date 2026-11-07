@@ -1,0 +1,39 @@
+# 支出申報系統 CI：測試、相依漏洞掃描、靜態安全檢查。任何一項失敗就不應部署。
+# 部署工作（需要雲端帳號與機密）尚未加入，待使用者提供後再接，且必須 needs: test。
+name: expense-ci
+on:
+  pull_request:
+    paths: ["expense-backend/**", ".github/workflows/expense-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["expense-backend/**"]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: expense-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: sudo apt-get update && sudo apt-get install -y libzbar0
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest -q
+  security:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: expense-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pip-audit bandit
+      - run: pip-audit -r requirements-prod.txt
+      - run: bandit -r app -ll

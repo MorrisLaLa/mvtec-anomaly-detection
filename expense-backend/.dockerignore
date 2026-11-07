@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+data
+tests
+docs
+.pytest_cache
+__pycache__
+*.pyc
+frontend/demo.html

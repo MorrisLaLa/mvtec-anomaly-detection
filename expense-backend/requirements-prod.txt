@@ -1,0 +1,8 @@
+# 正式環境相依（固定版本）。更新時請重新測試後再改版本；測試／瀏覽器工具不在此檔。
+fastapi==0.143.2
+uvicorn==0.53.0
+python-multipart==0.0.32
+PyYAML==6.0.1
+pyzbar==0.1.9
+Pillow==13.0.0
+qrcode[pil]==8.2

@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>支出申報 — 示範</title>
+<meta name="theme-color" content="#F5B700">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="支出申報">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231B1F1D'/%3E%3Ctext x='50' y='64' font-family='sans-serif' font-size='46' font-weight='700' fill='%23F5B700' text-anchor='middle'%3E%24%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%E6%94%AF%E5%87%BA%E7%94%B3%E5%A0%B1%22%2C%22short_name%22%3A%22%E6%94%AF%E5%87%BA%E7%94%B3%E5%A0%B1%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23EFEDE6%22%2C%22theme_color%22%3A%22%23F5B700%22%7D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+TC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1B1F1D;
+    --ink-soft: #565F5A;
+    --paper: #EFEDE6;
+    --surface: #FFFFFF;
+    --hazard: #F5B700;
+    --hazard-ink: #3A2C00;
+    --steel: #3E5C63;
+    --steel-soft: #E4EAEA;
+    --alert: #C1440E;
+    --alert-soft: #FBE7DD;
+    --good: #2F6F4E;
+    --good-soft: #E3EFE8;
+    --line: #D8D4C8;
+    --line-strong: #B7B2A2;
+    --shadow: 0 1px 2px rgba(27,31,29,0.06), 0 4px 14px rgba(27,31,29,0.07);
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --ink: #EDEBE3;
+      --ink-soft: #A9A79C;
+      --paper: #17191A;
+      --surface: #202322;
+      --hazard: #F5B700;
+      --hazard-ink: #241C00;
+      --steel: #8FB4BB;
+      --steel-soft: #253133;
+      --alert: #E2703A;
+      --alert-soft: #3A2419;
+      --good: #6FBE94;
+      --good-soft: #1E2E26;
+      --line: #34362F;
+      --line-strong: #46483E;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #EDEBE3;
+    --ink-soft: #A9A79C;
+    --paper: #17191A;
+    --surface: #202322;
+    --hazard: #F5B700;
+    --hazard-ink: #241C00;
+    --steel: #8FB4BB;
+    --steel-soft: #253133;
+    --alert: #E2703A;
+    --alert-soft: #3A2419;
+    --good: #6FBE94;
+    --good-soft: #1E2E26;
+    --line: #34362F;
+    --line-strong: #46483E;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  /* Cross-brand normalization: iOS Safari, Android Chrome/WebView, Samsung Internet all style
+     native form controls differently — strip their defaults so the app looks the same everywhere. */
+  input, textarea, select, button {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0;
+    font-family: inherit;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="date"] { min-height: 22px; } /* iOS Safari collapses date inputs without an explicit min-height */
+  button, .chip, .case-option, .user-option, .pin-key, .entry, .btn { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    font-family: 'IBM Plex Sans TC', -apple-system, BlinkMacSystemFont, 'PingFang TC', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--paper);
+  }
+
+  /* ---------- Header ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: env(safe-area-inset-top, 0px) 0 0 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    padding: 14px 18px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .brand-title { font-size: 17px; font-weight: 700; letter-spacing: 0.01em; }
+  .brand-sub { font-size: 11.5px; color: var(--ink-soft); }
+  .case-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 7px 12px 7px 10px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .case-pill:active { transform: scale(0.97); }
+  .case-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+  .case-pill-text { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; line-height: 1.15; }
+  .case-pill-text small { display: block; font-family: 'IBM Plex Sans TC', sans-serif; font-weight: 400; font-size: 9.5px; color: var(--ink-soft); letter-spacing: 0.02em; }
+
+  /* ---------- Network status strip ---------- */
+  .net-strip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .net-strip.offline { background: var(--alert-soft); color: var(--alert); }
+  .net-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+  .net-strip.offline .net-dot { background: var(--alert); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .net-strip-hint { color: var(--ink-soft); opacity: 0.65; margin-left: auto; font-size: 10.5px; }
+  .net-strip.offline .net-strip-hint { color: var(--alert); opacity: 0.75; }
+
+  /* ---------- Voucher viewer ---------- */
+  .voucher-overlay {
+    position: fixed; inset: 0;
+    background: rgba(20,22,20,0.86);
+    z-index: 80;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: env(safe-area-inset-top, 20px) 20px calc(env(safe-area-inset-bottom, 20px) + 10px);
+  }
+  .voucher-overlay.show { display: flex; }
+  .voucher-overlay img { max-width: 100%; max-height: 76vh; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+  .voucher-close {
+    margin-top: 18px;
+    background: var(--surface);
+    color: var(--ink);
+    border: none;
+    padding: 11px 22px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .voucher-hint { color: #D8D4C8; font-size: 11.5px; margin-top: 10px; }
+
+  /* ---------- Onboarding / identity ---------- */
+  .onboard {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: calc(env(safe-area-inset-top, 0px) + 48px) 24px 24px;
+  }
+  .onboard-badge {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--ink);
+    color: var(--hazard);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 22px;
+    margin-bottom: 18px;
+  }
+  .onboard-title { font-size: 21px; font-weight: 700; margin-bottom: 6px; }
+  .onboard-sub { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 28px; }
+  .onboard-label { font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; }
+  .user-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+  .user-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 13px;
+    padding: 13px 14px;
+    cursor: pointer;
+  }
+  .user-option:active { transform: scale(0.98); }
+  .user-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--steel-soft);
+    color: var(--steel);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    flex: none;
+  }
+  .user-option-text { font-size: 14px; font-weight: 600; }
+  .onboard-divider { display: flex; align-items: center; gap: 10px; color: var(--ink-soft); font-size: 11px; margin: 4px 0 16px; }
+  .onboard-divider::before, .onboard-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .onboard-manual { display: flex; gap: 8px; }
+  .onboard-manual .field-box { flex: 1; padding: 12px 14px; }
+  .onboard-manual .field-box input { font-family: 'IBM Plex Sans TC', sans-serif; font-weight: 500; font-size: 16px; }
+  .onboard-manual-btn {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 12px;
+    padding: 0 18px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .brand-user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .brand-user svg { width: 11px; height: 11px; color: var(--ink-soft); opacity: 0.6; }
+  .tag-user { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); font-family: 'IBM Plex Mono', monospace; }
+
+  /* ---------- PIN ---------- */
+  .pin-dots { display: flex; gap: 16px; justify-content: center; margin: 6px 0 10px; }
+  .pin-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line-strong);
+    background: transparent;
+  }
+  .pin-dot.filled { background: var(--ink); border-color: var(--ink); }
+  .pin-error {
+    font-size: 12px;
+    color: var(--alert);
+    min-height: 18px;
+    margin-bottom: 14px;
+  }
+  .pin-shake { animation: pinShake 0.4s ease; }
+  @keyframes pinShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-9px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(4px); }
+  }
+  .pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 280px;
+    margin: 6px auto 0;
+  }
+  .pin-key {
+    aspect-ratio: 1;
+    min-height: 56px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pin-key:active { background: var(--steel-soft); transform: scale(0.95); }
+  .pin-key.pin-key-ghost { visibility: hidden; }
+  .pin-key.pin-key-back { border: none; background: transparent; color: var(--ink-soft); font-size: 15px; }
+  .pin-key.pin-key-back svg { width: 20px; height: 20px; }
+  .pin-alt-link {
+    margin-top: 22px;
+    font-size: 12.5px;
+    color: var(--steel);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    animation: fadeSlide 0.28s ease;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screen, .toast, .sheet, .processing-ring { animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- Home / list ---------- */
+  .section-label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    padding: 18px 18px 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .month-total { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--ink); }
+
+  .entry-list { padding: 0 14px 140px; display: flex; flex-direction: column; gap: 8px; }
+  .entry {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+  .entry.new { animation: popIn 0.4s ease; border-color: var(--good); }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .entry-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+    background: var(--steel-soft);
+    color: var(--steel);
+  }
+  .entry-icon svg { width: 18px; height: 18px; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .entry-store { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry-amount { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 15px; flex: none; }
+  .entry-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10.5px;
+    padding: 2.5px 7px;
+    border-radius: 6px;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .tag-case { background: var(--steel-soft); color: var(--steel); font-family: 'IBM Plex Mono', monospace; }
+  .tag-cat { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); }
+  .tag-review { background: var(--alert-soft); color: var(--alert); }
+  .tag-ok { background: var(--good-soft); color: var(--good); }
+  .tag-pending { background: var(--hazard); color: var(--hazard-ink); }
+  .entry-date { font-size: 10.5px; color: var(--ink-soft); }
+
+  .empty-hint {
+    margin: 8px 14px 0;
+    padding: 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  /* ---------- Bottom action bar ---------- */
+  .action-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, transparent, var(--paper) 26%);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .action-bar .btn-primary { flex: 1 1 100%; min-height: 64px; font-size: 20px; }
+  .action-bar .btn-secondary { flex: 1 1 0; min-height: 48px; font-size: 16px; }
+  .result { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 24px 20px; text-align: center; }
+  .result-title { font-size: 28px; font-weight: 700; line-height: 1.3; }
+  .result-sub { font-size: 18px; color: var(--ink-soft); }
+  .result-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+  .result-actions .btn { min-height: 56px; font-size: 18px; }
+  .more-toggle { width: 100%; min-height: 48px; margin: 4px 0 10px; }
+  .btn {
+    border: none;
+    border-radius: 14px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.12s ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    flex: 1.5;
+    background: var(--hazard);
+    color: var(--hazard-ink);
+    font-size: 15px;
+    padding: 15px 10px;
+    box-shadow: 0 4px 16px rgba(245,183,0,0.35);
+  }
+  .btn-secondary {
+    flex: 1;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13.5px;
+    padding: 15px 8px;
+    border: 1px solid var(--line-strong);
+  }
+  .btn svg { width: 19px; height: 19px; flex: none; }
+
+  /* ---------- Processing overlay ---------- */
+  .processing {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 40px;
+    text-align: center;
+  }
+  .processing-ring {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 3px solid var(--line);
+    border-top-color: var(--hazard);
+    animation: spin 0.85s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .processing-text { font-size: 13.5px; color: var(--ink-soft); }
+  .processing-sub { font-size: 12px; color: var(--ink-soft); opacity: 0.7; }
+
+  /* ---------- Review screen ---------- */
+  .review-scroll { flex: 1; overflow-y: auto; padding: 4px 16px 24px; }
+  .receipt-preview {
+    margin-top: 12px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 14px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    box-shadow: var(--shadow);
+  }
+  .receipt-thumb {
+    width: 52px; height: 68px;
+    border-radius: 8px;
+    background: repeating-linear-gradient(135deg, var(--steel-soft), var(--steel-soft) 6px, var(--paper) 6px, var(--paper) 12px);
+    border: 1px solid var(--line);
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--steel);
+  }
+  .receipt-thumb svg { width: 22px; height: 22px; }
+  .receipt-info { flex: 1; min-width: 0; }
+  .receipt-info-title { font-size: 13.5px; font-weight: 600; }
+  .receipt-info-sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+
+  .field-group {
+    margin-top: 18px;
+  }
+  .field-label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 7px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .field-box {
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .field-box:focus-within { border-color: var(--steel); }
+  .field-box input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    width: 100%;
+  }
+  .field-box.amount input { font-size: 22px; }
+  .field-prefix { color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 15px; }
+  .field-box input[type="text"] { font-family: 'IBM Plex Sans TC', sans-serif; font-weight: 500; font-size: 16px; }
+  .field-box input[type="date"] { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 16px; }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    padding: 9px 13px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    color: var(--ink);
+  }
+  .chip.active {
+    border-color: var(--good);
+    background: var(--good-soft);
+    color: var(--good);
+    font-weight: 600;
+  }
+  .chip.active.low-conf {
+    border-color: var(--alert);
+    background: var(--alert-soft);
+    color: var(--alert);
+  }
+
+  .auto-note {
+    margin-top: 9px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.5;
+  }
+  .auto-note.warn { color: var(--alert); }
+  .auto-note svg { width: 13px; height: 13px; flex: none; }
+
+  .correction-note {
+    margin-top: 9px;
+    background: var(--steel-soft);
+    color: var(--steel);
+    border-radius: 9px;
+    padding: 9px 11px;
+    font-size: 11.5px;
+    line-height: 1.55;
+    display: none;
+  }
+  .correction-note.show { display: block; animation: popIn 0.25s ease; }
+
+  .case-select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+  .case-select-text { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; }
+  .case-select-text small { display: block; font-family: 'IBM Plex Sans TC', sans-serif; color: var(--ink-soft); font-weight: 400; font-size: 10.5px; margin-top: 2px; }
+
+  .threshold-banner {
+    margin-top: 16px;
+    background: var(--alert-soft);
+    color: var(--alert);
+    border-radius: 12px;
+    padding: 11px 13px;
+    font-size: 12px;
+    line-height: 1.6;
+    display: none;
+  }
+  .threshold-banner.show { display: block; }
+
+  /* ---------- Signature ---------- */
+  .field-hint { font-weight: 400; color: var(--ink-soft); font-size: 11px; }
+  .signature-box {
+    border: 1.5px dashed var(--line-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .signature-box.signed {
+    border-style: solid;
+    border-color: var(--good);
+    background: var(--good-soft);
+  }
+  .signature-box-icon {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-soft);
+    flex: none;
+  }
+  .signature-box.signed .signature-box-icon {
+    background: var(--surface);
+    padding: 2px;
+  }
+  .signature-box-icon svg { width: 18px; height: 18px; }
+  .signature-box-icon img { width: 100%; height: 100%; object-fit: contain; }
+  .signature-box-text { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .signature-box-sub { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+  .signature-box.signed .signature-box-text { color: var(--good); font-weight: 600; }
+
+  .sig-overlay {
+    position: fixed; inset: 0;
+    background: var(--paper);
+    z-index: 70;
+    display: none;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sig-overlay.show { display: flex; }
+  .sig-header {
+    padding: 14px 16px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+  }
+  .sig-header-title { font-size: 14.5px; font-weight: 700; }
+  .sig-header-sub { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+  .sig-close {
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .sig-close svg { width: 15px; height: 15px; }
+  .sig-canvas-wrap {
+    flex: 1;
+    margin: 16px;
+    border-radius: 14px;
+    border: 1.5px dashed var(--line-strong);
+    background: #FFFFFF;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .sig-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+  .sig-baseline {
+    position: absolute;
+    left: 20px; right: 20px; bottom: 34%;
+    border-bottom: 1.5px dashed #D8D4C8;
+    pointer-events: none;
+  }
+  .sig-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #B7B2A2;
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .sig-footer {
+    padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    gap: 10px;
+  }
+
+  .review-footer {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .btn-submit {
+    width: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 15.5px;
+    padding: 16px;
+    border-radius: 14px;
+  }
+  :root[data-theme="dark"] .btn-submit { background: var(--hazard); color: var(--hazard-ink); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-submit { background: var(--hazard); color: var(--hazard-ink); } }
+
+  .back-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px 2px;
+  }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex: none;
+  }
+  .back-btn svg { width: 17px; height: 17px; }
+  .screen-title { font-size: 15.5px; font-weight: 700; }
+
+  /* ---------- Bottom sheet ---------- */
+  .sheet-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 100%);
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    z-index: 51;
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    transition: transform 0.28s cubic-bezier(.2,.8,.3,1);
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+  }
+  .sheet.show { transform: translate(-50%, 0); }
+  .sheet-handle { width: 36px; height: 4px; background: var(--line-strong); border-radius: 4px; margin: 8px auto 14px; }
+  .sheet-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; padding: 0 4px; }
+  .sheet-sub { font-size: 11.5px; color: var(--ink-soft); padding: 0 4px; margin-bottom: 14px; }
+  .case-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--line);
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .case-option.selected { border-color: var(--good); background: var(--good-soft); }
+  .case-option-text { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; font-weight: 600; }
+  .case-option-text small { display: block; font-family: 'IBM Plex Sans TC', sans-serif; color: var(--ink-soft); font-weight: 400; font-size: 10.5px; margin-top: 2px; }
+  .check-circle { width: 18px; height: 18px; flex: none; color: var(--good); opacity: 0; }
+  .case-option.selected .check-circle { opacity: 1; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%) translateY(10px);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+    z-index: 60;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    max-width: calc(480px - 40px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .toast svg { width: 16px; height: 16px; color: var(--good); flex: none; }
+
+  .wifi-row { display:flex; align-items:center; gap:8px; padding:7px 18px; font-size:11.5px; color:var(--ink-soft); border-top:1px solid var(--line); }
+  .wifi-row input { -webkit-appearance:checkbox; appearance:auto; width:16px; height:16px; margin:0; }
+  .entry-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .mini-btn { border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 9px; font-size:11px; font-weight:600; cursor:pointer; }
+  .mini-btn.danger { color:var(--alert); border-color:var(--alert); }
+  .export-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 18px; border-top:1px solid var(--line); color:var(--ink-soft); }
+  .rq-pick { -webkit-appearance:checkbox; appearance:auto; width:24px; height:24px; margin:0 4px 0 0; flex:none; }
+  #historySheet:not(.show) { visibility: hidden; }  /* 收起時不可見、也不能用鍵盤點到 */
+  .history-step { padding:8px 0; border-bottom:1px solid var(--line); font-size:16px; line-height:1.5; }
+  .history-step small { display:block; color:var(--ink-soft); }
+  .export-row input { border:1.5px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); padding:6px 8px; min-height:44px; font-size:16px; }
+
+  ::selection { background: var(--hazard); color: var(--hazard-ink); }
+
+  /* ---------- F2 現場可讀性：戶外單手，文字 ≥16px、可點項目 ≥44px ---------- */
+  .brand-sub, #brandUserLabel, .case-pill-text, .case-pill-text small, #boundCaseLabel, .net-strip, #netLabel, .net-strip-hint,
+  .wifi-row, .section-label, .month-total, .entry *, .tag, .field-label, .field-hint, .field-prefix, .auto-note, .correction-note,
+  .receipt-info-title, .receipt-info-sub, .case-select-text, .case-select-text small, .signature-box-text, .signature-box-sub,
+  .chip, .sheet-title, .sheet-sub, .case-option-text, .case-option-text small, .screen-title, .btn, .more-toggle, .mini-btn,
+  .threshold-banner, .sig-header-sub, #toastText { font-size: 16px !important; }
+  .back-btn { width: 44px; height: 44px; }
+  .brand-user, .case-pill, .net-strip, .chip, .case-select, .mini-btn, .wifi-row { min-height: 44px; }
+  .brand-user, .net-strip, .wifi-row, .case-pill { display: flex; align-items: center; }
+  .field-box input, .field-box select { min-height: 44px; font-size: 18px; }
+  .entry-amount, .entry-store { font-size: 17px !important; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 裝置綁定畫面（首次開啟或金鑰失效時） ===== -->
+  <div id="screen-bind" class="screen" style="display:none;">
+    <div class="onboard">
+      <div class="onboard-badge">$</div>
+      <div class="onboard-title">綁定這支手機</div>
+      <div class="onboard-sub">請輸入管理員交給你的裝置金鑰。金鑰只會存在這支手機，用來證明這是公司核准的裝置。</div>
+      <div class="field-box"><input type="text" id="bindKey" placeholder="ek_…" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
+      <div class="pin-error" id="bindError" style="margin-top:10px;"></div>
+      <button class="onboard-manual-btn" style="padding:14px; margin-top:4px;" data-click="submitBind">綁定</button>
+    </div>
+  </div>
+
+  <!-- ===== 配對中／配對失敗（點連結或掃 QR 後） ===== -->
+  <div id="screen-pair" class="screen" style="display:none;">
+    <div class="onboard">
+      <div class="onboard-badge">$</div>
+      <div class="onboard-title" id="pairTitle">正在設定這支手機…</div>
+      <div class="onboard-sub" id="pairMsg">請稍等，不需要輸入任何東西。</div>
+    </div>
+  </div>
+
+  <!-- ===== 送出後結果卡（全螢幕） ===== -->
+  <div id="screen-result" class="screen" style="display:none;">
+    <div class="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="result-actions" id="resultActions"></div>
+    </div>
+  </div>
+
+  <!-- ===== 設定頁 ===== -->
+  <div id="screen-settings" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" data-click="goHome">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l-8 8 8 8"/></svg>
+      </div>
+      <div class="back-title">設定</div>
+    </div>
+    <div class="onboard">
+      <label class="wifi-row"><input type="checkbox" id="pinEnabled" data-change="onPinToggle"> 開啟 PIN（選用：每次開啟要輸入 4 位數）</label>
+      <div class="onboard-sub">PIN 只是這支手機本機的解鎖，不是必要的。手機遺失請通知管理員撤銷。</div>
+      <div id="adminTools" style="display:none; margin-top:18px;">
+        <button class="btn btn-secondary" id="unblockBtn" data-click="unblockLogins">解除登入封鎖</button>
+        <div class="onboard-sub">有人打錯太多次時，其他人可能暫時無法綁定新手機；按這裡立即解除（只有管理員看得到）。</div>
+        <div class="onboard-sub" style="margin-top:14px;font-weight:600;">裝置與權限（管理員最少 1 位、最多 2 位）</div>
+        <div id="adminDevices"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PIN Screen (setup / unlock) ===== -->
+  <div id="screen-pin" class="screen" style="display:none;">
+    <div class="onboard" style="align-items:center; text-align:center;">
+      <div class="onboard-badge" id="pinAvatar">王</div>
+      <div class="onboard-title" id="pinTitle">輸入 PIN</div>
+      <div class="onboard-sub" id="pinSub" style="margin-bottom:14px;">為此身份設定 4 位數 PIN</div>
+      <div class="pin-dots" id="pinDots">
+        <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+      </div>
+      <div class="pin-error" id="pinError"></div>
+      <div class="pin-keypad" id="pinKeypad">
+        <button class="pin-key" data-click="pinDigit" data-args='["1"]'>1</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["2"]'>2</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["3"]'>3</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["4"]'>4</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["5"]'>5</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["6"]'>6</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["7"]'>7</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["8"]'>8</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["9"]'>9</button>
+        <button class="pin-key pin-key-ghost">·</button>
+        <button class="pin-key" data-click="pinDigit" data-args='["0"]'>0</button>
+        <button class="pin-key pin-key-back" data-click="pinBackspace">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H8l-6 7 6 7h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><path d="M14 10l4 4M18 10l-4 4"/></svg>
+        </button>
+      </div>
+      <div class="pin-alt-link" id="pinAltLink" data-click="pinAlt">忘記 PIN？</div>
+    </div>
+  </div>
+
+  <!-- ===== Home Screen ===== -->
+  <div id="screen-home" class="screen">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-title">支出申報</div>
+          <div class="brand-user" data-click="openSettings">
+            <span class="brand-sub" id="brandUserLabel">一六國際 · 現場人員</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l8 8-8 8"/></svg>
+          </div>
+        </div>
+        <div class="case-pill" data-click="openCaseSheet">
+          <span class="case-dot"></span>
+          <span class="case-pill-text" id="boundCaseLabel">UY2301<small>目前案件</small></span>
+        </div>
+      </div>
+      <div class="net-strip" id="netStrip" data-click="syncNow">
+        <span class="net-dot" id="netDot"></span>
+        <span id="netLabel">線上 · 資料即時同步</span>
+        <span class="net-strip-hint">（點一下立即同步）</span>
+      </div>
+      <div class="wifi-row" id="reviewBar" style="display:none; justify-content:space-between;">
+        <span id="reviewBarText">審核</span>
+        <button class="mini-btn" data-click="openReviewQueue">開啟審核清單</button>
+      </div>
+      <label class="wifi-row"><input type="checkbox" id="wifiOnly" data-change="onWifiToggle"> 僅 Wi‑Fi 自動上傳（省行動網路流量）</label>
+    </div>
+
+    <div class="section-label">
+      <span>本月申報</span>
+      <span class="month-total" id="monthTotal">NT$ 0</span>
+    </div>
+
+    <div class="entry-list" id="entryList"></div>
+  </div>
+
+  <input type="file" id="capCamera" accept="image/*" capture="environment" hidden data-change="onReceiptPicked" data-pass="el">
+  <input type="file" id="capAlbum" accept="image/*" hidden data-change="onReceiptPicked" data-pass="el">
+  <div class="action-bar" id="homeActionBar">
+    <button class="btn btn-primary" data-click="startCapture" data-args='["photo"]'>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.6A2 2 0 0 1 9.85 3.4h4.3a2 2 0 0 1 1.75 1l.9 1.6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><circle cx="12" cy="12.5" r="3.6"/></svg>
+      拍收據
+    </button>
+    <button class="btn btn-secondary" data-click="startCapture" data-args='["album"]'>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><path d="M3.5 15.5 8 11l3 3 4-4.5 5.5 6"/></svg>
+      從相簿選
+    </button>
+    <button class="btn btn-secondary" data-click="startNoReceipt">
+      沒有收據
+    </button>
+  </div>
+
+  <!-- ===== 審核清單（reviewer／admin） ===== -->
+  <div id="screen-reviewq" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" data-click="goHome">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="screen-title">審核清單</div>
+    </div>
+    <div class="wifi-row" style="gap:8px;">
+      <button class="mini-btn" id="rqHeld" data-click="loadReviewQueue" data-args='["held"]'>待處理</button>
+      <button class="mini-btn" id="rqSampled" data-click="loadReviewQueue" data-args='["sampled"]'>自動核准・抽查</button>
+      <button class="mini-btn" id="rqDone" data-click="loadReviewQueue" data-args='["done"]'>已處理</button>
+    </div>
+    <div class="export-row">
+      <span>申報日期</span>
+      <input type="date" id="exportFrom" aria-label="匯出開始日期">
+      <span>至</span>
+      <input type="date" id="exportTo" aria-label="匯出結束日期">
+      <button class="mini-btn" id="exportBtn" data-click="exportCsv">匯出 CSV（給會計）</button>
+      <button class="mini-btn" id="exportEventsBtn" data-click="exportCsv" data-args='["events"]'>匯出處理紀錄</button>
+    </div>
+    <div class="export-row" id="bulkRow">
+      <button class="mini-btn" id="rqSelectAll" data-click="selectAllPicks">全選</button>
+      <button class="mini-btn" id="bulkApproveBtn" data-click="bulkApprove">核准勾選的申報</button>
+    </div>
+    <div class="entry-list" id="reviewList"></div>
+  </div>
+
+  <!-- ===== Processing Screen ===== -->
+  <div id="screen-processing" class="screen" style="display:none;">
+    <div class="back-row"><div style="width:34px"></div></div>
+    <div class="processing">
+      <div class="processing-ring"></div>
+      <div>
+        <div class="processing-text" id="processingText">辨識單據中…</div>
+        <div class="processing-sub">擷取金額 · 店家 · 日期</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Review Screen ===== -->
+  <div id="screen-review" class="screen" style="display:none;">
+    <div class="back-row">
+      <div class="back-btn" data-click="goHome">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="screen-title">確認申報內容</div>
+    </div>
+
+    <div class="review-scroll">
+
+      <div class="receipt-preview" id="receiptPreview">
+        <div class="receipt-thumb" id="receiptThumb">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3"/></svg>
+        </div>
+        <div class="receipt-info">
+          <div class="receipt-info-title" id="receiptTypeLabel">統一發票</div>
+          <div class="receipt-info-sub" id="receiptTypeSub">已自動辨識，請確認以下內容</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">金額</div>
+        <div class="field-box amount">
+          <span class="field-prefix">NT$</span>
+          <input type="number" id="fieldAmount" inputmode="numeric" value="0" data-input="onAmountChange">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">店家</div>
+        <div class="field-box">
+          <input type="text" id="fieldStore" value="">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">工程案件</div>
+        <div class="case-select" data-click="openCaseSheet" data-args='[true]'>
+          <span class="case-select-text" id="reviewCaseLabel">UY2301<small>點一下可更換</small></span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="threshold-banner" id="thresholdBanner"></div>
+
+      <button type="button" class="btn btn-secondary more-toggle" id="moreToggle" data-click="toggleMore">更多選項</button>
+      <div id="moreOptions" style="display:none;">
+      <div class="field-group" style="display:flex; gap:12px;">
+        <div style="flex:1;">
+          <div class="field-label">支出日期</div>
+          <div class="field-box"><input type="date" id="fieldDate"></div>
+        </div>
+        <div style="flex:1;">
+          <div class="field-label">申報日期</div>
+          <div class="field-box" style="opacity:0.6;"><input type="date" id="fieldReportDate" disabled></div>
+        </div>
+      </div>
+
+      <div class="field-group" id="docTypeGroup" style="display:none;">
+        <div class="field-label">單據類型</div>
+        <div class="chip-row" id="docTypeChips"></div>
+        <div class="auto-note" id="docTypeNote"></div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">
+          <span>用途</span>
+        </div>
+        <div class="chip-row" id="categoryChips"></div>
+        <div class="auto-note" id="categoryAutoNote"></div>
+        <div class="correction-note" id="correctionNote"></div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label"><span>廠商簽名 <span class="field-hint">選填，如油罐車、供應商送貨單</span></span></div>
+        <div class="signature-box" id="signatureBox" data-click="openSignaturePad">
+          <div class="signature-box-icon" id="signatureBoxIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5l1.6-4.6L14.9 2.6a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.1 16.4 3 18z"/><path d="M3 21h18"/></svg>
+          </div>
+          <div>
+            <div class="signature-box-text" id="signatureBoxText">點此請廠商簽名</div>
+            <div class="signature-box-sub" id="signatureBoxSub">確認交付數量或到貨內容</div>
+          </div>
+        </div>
+      </div>
+
+      </div>
+
+    </div>
+
+    <div class="review-footer">
+      <button class="btn btn-submit" data-click="submitEntry">送出申報</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Signature overlay -->
+<div class="sig-overlay" id="sigOverlay">
+  <div class="sig-header">
+    <div>
+      <div class="sig-header-title">廠商簽名</div>
+      <div class="sig-header-sub" id="sigHeaderSub">請將手機交給廠商，於下方簽名</div>
+    </div>
+    <div class="sig-close" data-click="cancelSignature">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </div>
+  </div>
+  <div class="sig-canvas-wrap" id="sigCanvasWrap">
+    <div class="sig-baseline"></div>
+    <div class="sig-placeholder" id="sigPlaceholder">手指或觸控筆簽名</div>
+    <canvas id="sigCanvas"></canvas>
+  </div>
+  <div class="sig-footer">
+    <button class="btn btn-secondary" style="flex:1" data-click="clearSignature">清除</button>
+    <button class="btn btn-primary" style="flex:1.5" data-click="confirmSignature">確認簽名</button>
+  </div>
+</div>
+
+<!-- Voucher viewer -->
+<div class="voucher-overlay" id="voucherOverlay" data-click="closeVoucherViewer" data-pass="event">
+  <img id="voucherImg" src="" alt="簽收單">
+  <div class="voucher-hint">金額、日期、工程案件與簽名已合併存證於同一張簽收單</div>
+  <button class="voucher-close" data-click="closeVoucherViewer" data-pass="event">關閉</button>
+</div>
+
+<!-- Case bottom sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop" data-click="closeCaseSheet"></div>
+<div class="sheet" id="caseSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">選擇案件</div>
+  <div class="sheet-sub">最近使用的排在前面</div>
+  <div id="caseOptions"></div>
+</div>
+
+<!-- 處理紀錄 -->
+<div class="sheet-backdrop" id="historyBackdrop" data-click="closeHistory"></div>
+<div class="sheet" id="historySheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="historyTitle">處理紀錄</div>
+  <div id="historySteps" style="max-height:60vh; overflow-y:auto;"></div>
+  <button class="btn btn-secondary" style="width:100%; margin-top:12px; min-height:48px;" data-click="closeHistory">關閉</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
+  <span id="toastText"></span>
+</div>
+
+<script src="sync.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
